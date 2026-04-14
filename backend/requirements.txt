@@ -1,0 +1,15 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+python-dotenv==1.0.1
+pydantic==2.10.4
+pydantic-settings==2.7.0
+sqlalchemy==2.0.36
+psycopg2-binary==2.9.10
+httpx==0.28.1
+gradio_client>=2.4.1
+sentence-transformers==3.3.1
+openai==1.58.1
+mlflow==2.18.0
+pandas==2.2.3
+numpy==2.2.1

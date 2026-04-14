@@ -1,0 +1,4 @@
+order_id,customer_id,order_date,product_id,product_name,category,price,quantity,payment_method,country,city,is_fraud
+ORD-1,CUST-1,2024-01-15,P-1,Widget A,Electronics,99.0,2,card,US,New York,0
+ORD-2,CUST-2,2024-02-01,P-2,Service Pack,Services,250.0,1,wire,DE,Berlin,1
+ORD-3,CUST-1,2024-02-10,P-1,Widget A,Electronics,99.0,1,card,US,New York,0

@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+node_modules/
+frontend/dist/
+billing_anomaly.db
+backend/billing_anomaly.db
+mlruns/
+*.log
