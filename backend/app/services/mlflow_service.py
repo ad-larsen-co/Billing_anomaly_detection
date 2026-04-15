@@ -1,28 +1,44 @@
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
 import mlflow
+from mlflow.tracking import MlflowClient
 
-from app.config import get_settings
+from app.config import MLRUNS_DIR, get_settings
 
 logger = logging.getLogger(__name__)
 
 _mlflow_ready = False
 
 
+def _ensure_named_experiment(client: MlflowClient, name: str) -> None:
+    """
+    Create a named experiment if missing. A fresh file store often has no default
+    experiment ID 0, which causes 'Could not find experiment with ID 0' when logging.
+    """
+    try:
+        if client.get_experiment_by_name(name) is None:
+            client.create_experiment(name)
+    except Exception as e:
+        logger.warning("MLflow create/get experiment %r: %s", name, e)
+
+
 def init_mlflow() -> None:
     global _mlflow_ready
     settings = get_settings()
     uri = settings.mlflow_tracking_uri
+    name = settings.mlflow_experiment_name or "billing_anomaly"
+
     try:
+        MLRUNS_DIR.mkdir(parents=True, exist_ok=True)
         mlflow.set_tracking_uri(uri)
-        os.makedirs(uri.replace("file:", ""), exist_ok=True) if uri.startswith(
-            "file:"
-        ) else None
+        client = MlflowClient(tracking_uri=uri)
+        _ensure_named_experiment(client, name)
+        mlflow.set_experiment(name)
         _mlflow_ready = True
+        logger.info("MLflow ready: uri=%s experiment=%r", uri, name)
     except Exception as e:
         logger.warning("MLflow init failed (non-fatal): %s", e)
         _mlflow_ready = False
@@ -57,7 +73,7 @@ def log_feedback_event(
     if not _mlflow_ready:
         return
     try:
-        with mlflow.start_run(run_name="feedback"):
+        with mlflow.start_run(run_name=f"feedback_{action}_{anomaly_type[:32]}"):
             mlflow.log_param("anomaly_type", anomaly_type)
             mlflow.log_param("action", action)
             if extra:
