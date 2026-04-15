@@ -30,6 +30,8 @@ def record_feedback(
         notes=notes,
     )
     session.add(fb)
+    # Populate PK and column defaults before building FeedbackOut (otherwise id/created_at are None).
+    session.flush()
 
     # Simple learning loop: nudge historical TPR based on approvals vs dismissals
     try:
