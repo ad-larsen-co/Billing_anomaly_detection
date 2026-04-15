@@ -9,6 +9,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 ROOT = Path(__file__).resolve().parents[2]
 ENV_FILE = ROOT / ".env"
 DEFAULT_SQLITE_PATH = ROOT / "billing_anomaly.db"
+# Stable MLflow file store under project root (avoids cwd-relative ./mlruns confusion)
+MLRUNS_DIR = (ROOT / "mlruns").resolve()
 
 
 class Settings(BaseSettings):
@@ -22,12 +24,10 @@ class Settings(BaseSettings):
     # Default SQLite for local runs; Postgres+pgvector supported via docker-compose
     database_url: str = f"sqlite:///{DEFAULT_SQLITE_PATH.resolve().as_posix()}"
     hf_space_url: str = "https://luca1028-anomaly-detector.hf.space"
-    mlflow_tracking_uri: str = "file:./mlruns"
+    mlflow_tracking_uri: str = MLRUNS_DIR.as_uri()
+    mlflow_experiment_name: str = "billing_anomaly"
     use_mock_ai: bool = False
-    cors_origins: str = (
-        "http://localhost:5173,http://127.0.0.1:5173,"
-        "http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177"
-    )
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     @property
     def cors_origin_list(self) -> list[str]:
