@@ -12,7 +12,7 @@ function Badge({ children, tone }: { children: ReactNode; tone: "red" | "amber" 
     slate: "bg-slate-100 text-slate-700 ring-slate-200",
   };
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${map[tone]}`}>
+    <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ring-1 ${map[tone]}`}>
       {children}
     </span>
   );
@@ -79,20 +79,20 @@ function DatasetPreviewTable({
   if (rows.length === 0) return null;
   const cols = Object.keys(rows[0] ?? {});
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-sm font-semibold text-slate-900">Input dataset</h2>
-      <p className="mt-1 text-xs text-slate-500">
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 className="text-base font-semibold text-slate-900">Input dataset</h2>
+      <p className="mt-1.5 text-sm text-slate-500">
         Preview of uploaded CSV — showing {rows.length} of {totalRows} row{totalRows === 1 ? "" : "s"} (capped for
         performance).
       </p>
-      <div className="mt-3 max-h-[min(60vh,520px)] overflow-auto rounded-xl border border-slate-100">
-        <table className="w-full min-w-max border-collapse text-left text-xs">
+      <div className="mt-4 max-h-[min(60vh,520px)] overflow-auto rounded-xl border border-slate-100">
+        <table className="w-full min-w-max border-collapse text-left text-sm">
           <thead className="sticky top-0 z-10 bg-slate-100 shadow-sm">
             <tr>
               {cols.map((c) => (
                 <th
                   key={c}
-                  className="whitespace-nowrap border-b border-slate-200 px-2 py-2 font-semibold text-slate-800"
+                  className="whitespace-nowrap border-b border-slate-200 px-3 py-2.5 font-semibold text-slate-800"
                 >
                   {c}
                 </th>
@@ -103,7 +103,7 @@ function DatasetPreviewTable({
             {rows.map((r, i) => (
               <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/80">
                 {cols.map((c) => (
-                  <td key={c} className="max-w-[16rem] truncate px-2 py-1.5 align-top font-mono text-[11px]">
+                  <td key={c} className="max-w-[16rem] truncate px-3 py-2 align-top font-mono text-sm">
                     {formatDatasetCell(r[c])}
                   </td>
                 ))}
@@ -272,7 +272,7 @@ export default function App() {
   const evidencePanel = (
     <>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-slate-900">Details</h2>
+        <h2 className="text-base font-semibold text-slate-900">Details</h2>
         {selected && (
           <div className="flex items-center gap-1">
             <button
@@ -368,18 +368,18 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <div className="flex min-h-screen">
         <aside className="hidden w-64 flex-shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
-          <div className="border-b border-slate-100 px-5 py-4">
-            <div className="text-sm font-semibold text-slate-900">Billing Console</div>
-            <div className="text-xs text-slate-500">Anomaly detection & RAG</div>
+          <div className="border-b border-slate-100 px-5 py-5">
+            <div className="text-base font-semibold text-slate-900">Billing Console</div>
+            <div className="mt-0.5 text-sm text-slate-500">Anomaly detection & RAG</div>
           </div>
-          <nav className="flex flex-1 flex-col gap-1 px-3 py-4 text-sm">
+          <nav className="flex flex-1 flex-col gap-1.5 px-4 py-5 text-base">
             {CONSOLE_NAV.map((item) => (
               <button
                 key={item.id}
                 type="button"
                 title={item.hint}
                 onClick={() => setConsoleSection(item.id)}
-                className={`rounded-lg px-3 py-2 text-left transition ${
+                className={`rounded-lg px-3 py-2.5 text-left transition ${
                   consoleSection === item.id
                     ? "bg-slate-100 font-medium text-slate-900"
                     : "text-slate-600 hover:bg-slate-50"
@@ -389,18 +389,18 @@ export default function App() {
               </button>
             ))}
           </nav>
-          <div className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">
+          <div className="border-t border-slate-100 px-5 py-4 text-sm text-slate-500">
             FastAPI · pgvector · GPT‑4o‑mini
           </div>
         </aside>
 
         <main className="min-w-0 flex-1">
           <header className="border-b border-slate-200 bg-white/80 backdrop-blur">
-            <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 sm:px-6">
+            <div className="mx-auto flex max-w-6xl flex-col gap-4 px-5 py-5 sm:px-7">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <h1 className="text-lg font-semibold tracking-tight text-slate-900">{meta.title}</h1>
-                  <p className="mt-0.5 text-sm text-slate-500">{meta.subtitle}</p>
+                  <h1 className="text-xl font-semibold tracking-tight text-slate-900">{meta.title}</h1>
+                  <p className="mt-1 text-base text-slate-500">{meta.subtitle}</p>
                 </div>
                 <div className="hidden shrink-0 items-center gap-2 sm:flex">
                   <Badge tone="blue">HF Space</Badge>
@@ -413,7 +413,7 @@ export default function App() {
                     key={item.id}
                     type="button"
                     onClick={() => setConsoleSection(item.id)}
-                    className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                    className={`shrink-0 rounded-full px-3.5 py-2 text-sm font-medium transition ${
                       consoleSection === item.id
                         ? "bg-slate-900 text-white"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -426,7 +426,7 @@ export default function App() {
             </div>
           </header>
 
-          <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
+          <div className="mx-auto max-w-6xl space-y-7 px-5 py-7 sm:px-7">
             {error && (
               <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
                 {error}
@@ -438,7 +438,7 @@ export default function App() {
                 <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                     <div>
-                      <h2 className="text-sm font-semibold text-slate-900">Data ingest</h2>
+                      <h2 className="text-base font-semibold text-slate-900">Data ingest</h2>
                       <p className="mt-1 text-sm text-slate-500">
                         Required columns: order_id, customer_id, order_date, product_id, product_name, category,
                         price, quantity, payment_method, country, city
@@ -525,21 +525,21 @@ export default function App() {
             {consoleSection === "anomalies" && (
               <section>
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-sm font-semibold text-slate-900">All anomalies</h2>
+                  <h2 className="text-base font-semibold text-slate-900">All anomalies</h2>
                   <span className="text-xs text-slate-500">{anomalies.length} items</span>
                 </div>
                 {stats && (
                   <div className="mb-4 grid gap-3 sm:grid-cols-3">
                     <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                      <div className="text-[10px] font-medium uppercase text-slate-500">Rows</div>
+                      <div className="text-xs font-medium uppercase text-slate-500">Rows</div>
                       <div className="text-lg font-semibold text-slate-900">{stats.total}</div>
                     </div>
                     <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                      <div className="text-[10px] font-medium uppercase text-slate-500">Anomalies</div>
+                      <div className="text-xs font-medium uppercase text-slate-500">Anomalies</div>
                       <div className="text-lg font-semibold text-rose-600">{stats.hits}</div>
                     </div>
                     <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                      <div className="text-[10px] font-medium uppercase text-slate-500">Rate</div>
+                      <div className="text-xs font-medium uppercase text-slate-500">Rate</div>
                       <div className="text-lg font-semibold text-slate-900">{stats.rate}%</div>
                     </div>
                   </div>
@@ -555,7 +555,7 @@ export default function App() {
               <div className="grid gap-6 lg:grid-cols-5">
                 <section className="lg:col-span-2">
                   <div className="mb-3 flex items-center justify-between">
-                    <h2 className="text-sm font-semibold text-slate-900">Pick an anomalies</h2>
+                    <h2 className="text-base font-semibold text-slate-900">Pick an anomalies</h2>
                     <span className="text-xs text-slate-500">{anomalies.length} items</span>
                   </div>
                   {renderAnomalyList((a) => setSelected(a))}

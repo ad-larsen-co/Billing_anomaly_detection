@@ -2,7 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Slightly larger base (~108% of browser default) — scales rem-based typography and spacing. */
+html {
+  font-size: 108%;
+}
+
 body {
   margin: 0;
   font-family: Inter, system-ui, sans-serif;
+  line-height: 1.55;
 }
