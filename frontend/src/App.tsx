@@ -45,7 +45,7 @@ function FeedbackThumbImage({
   );
 }
 
-function IconAlertCircle(props: { className?: string }) {
+function IconAnomalyCircle(props: { className?: string }) {
   return (
     <svg
       className={props.className}
@@ -116,20 +116,20 @@ function DatasetPreviewTable({
   );
 }
 
-type ConsoleSection = "overview" | "alerts" | "evidence" | "assistant";
+type ConsoleSection = "overview" | "anomalies" | "evidence" | "assistant";
 
 const SECTION_META: Record<ConsoleSection, { title: string; subtitle: string }> = {
   overview: {
     title: "Overview",
     subtitle: "Ingest billing data, inspect the loaded dataset, and see run metrics.",
   },
-  alerts: {
-    title: "Anomaly alerts",
+  anomalies: {
+    title: "Anomalies",
     subtitle: "Browse detected anomalies from the latest analysis run.",
   },
   evidence: {
     title: "Evidence & remediation",
-    subtitle: "Contract evidence, solver playbook, and human feedback on each alert.",
+    subtitle: "Contract evidence, solver playbook, and human feedback on each anomaly.",
   },
   assistant: {
     title: "Assistant",
@@ -139,7 +139,7 @@ const SECTION_META: Record<ConsoleSection, { title: string; subtitle: string }> 
 
 const CONSOLE_NAV: { id: ConsoleSection; label: string; hint: string }[] = [
   { id: "overview", label: "Overview", hint: "Upload, stats, dataset" },
-  { id: "alerts", label: "Alerts", hint: "Anomaly list" },
+  { id: "anomalies", label: "Anomalies", hint: "Anomaly list" },
   { id: "evidence", label: "Evidence", hint: "RAG evidence & actions" },
   { id: "assistant", label: "Assistant", hint: "NLP chat" },
 ];
@@ -321,7 +321,7 @@ export default function App() {
           </div>
         )}
         {run && !selected && (
-          <div className="text-sm text-slate-500">Select an alert from the list to view evidence and remediation.</div>
+          <div className="text-sm text-slate-500">Select an anomaly from the list to view evidence and remediation.</div>
         )}
         {selected && (
           <div className="space-y-4">
@@ -482,7 +482,7 @@ export default function App() {
                       <div className="mt-2 text-2xl font-semibold text-rose-600">{stats.hits}</div>
                     </div>
                     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                      <div className="text-xs font-medium text-slate-500">Alert rate</div>
+                      <div className="text-xs font-medium text-slate-500">Anomaly rate</div>
                       <div className="mt-2 text-2xl font-semibold text-slate-900">{stats.rate}%</div>
                     </div>
                   </section>
@@ -497,7 +497,7 @@ export default function App() {
                   <button
                     type="button"
                     className="font-semibold text-blue-700 underline decoration-blue-200 underline-offset-2 hover:text-blue-900"
-                    onClick={() => setConsoleSection("alerts")}
+                    onClick={() => setConsoleSection("anomalies")}
                   >
                     Anomalies
                   </button>{" "}
@@ -522,10 +522,10 @@ export default function App() {
               </>
             )}
 
-            {consoleSection === "alerts" && (
+            {consoleSection === "anomalies" && (
               <section>
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-sm font-semibold text-slate-900">All alerts</h2>
+                  <h2 className="text-sm font-semibold text-slate-900">All anomalies</h2>
                   <span className="text-xs text-slate-500">{anomalies.length} items</span>
                 </div>
                 {stats && (
@@ -555,7 +555,7 @@ export default function App() {
               <div className="grid gap-6 lg:grid-cols-5">
                 <section className="lg:col-span-2">
                   <div className="mb-3 flex items-center justify-between">
-                    <h2 className="text-sm font-semibold text-slate-900">Pick an alert</h2>
+                    <h2 className="text-sm font-semibold text-slate-900">Pick an anomalies</h2>
                     <span className="text-xs text-slate-500">{anomalies.length} items</span>
                   </div>
                   {renderAnomalyList((a) => setSelected(a))}
@@ -565,7 +565,7 @@ export default function App() {
             )}
 
             {consoleSection === "assistant" && (
-              <section>
+              <section className="flex min-h-[calc(100vh-12rem)] flex-col">
                 <ChatAssistant />
               </section>
             )}
@@ -592,7 +592,7 @@ export default function App() {
             {feedbackToast.tone === "success" ? (
               <FeedbackThumbImage variant="up" className="h-4 w-4" />
             ) : (
-              <IconAlertCircle className="h-3.5 w-3.5" />
+              <IconAnomalyCircle className="h-3.5 w-3.5" />
             )}
           </span>
           <span className="leading-snug">{feedbackToast.message}</span>
