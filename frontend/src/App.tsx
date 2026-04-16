@@ -1,15 +1,7 @@
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  analyzeCsv,
-  fetchFeedbackList,
-  postFeedback,
-  type AnalysisRun,
-  type Anomaly,
-  type FeedbackListItem,
-} from "./api";
+import { useCallback, useMemo, useState } from "react";
+import { analyzeCsv, postFeedback, type AnalysisRun, type Anomaly } from "./api";
 import ChatAssistant from "./components/ChatAssistant";
-import FeedbackFeed from "./components/FeedbackFeed";
 
 function Badge({ children, tone }: { children: ReactNode; tone: "red" | "amber" | "blue" | "slate" }) {
   const map = {
@@ -32,12 +24,65 @@ function severityTone(s: string): "red" | "amber" | "blue" | "slate" {
   return "slate";
 }
 
+function formatDatasetCell(v: unknown): string {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "object") return JSON.stringify(v);
+  return String(v);
+}
+
+function DatasetPreviewTable({
+  rows,
+  totalRows,
+}: {
+  rows: Record<string, unknown>[];
+  totalRows: number;
+}) {
+  if (rows.length === 0) return null;
+  const cols = Object.keys(rows[0] ?? {});
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 className="text-sm font-semibold text-slate-900">Input dataset</h2>
+      <p className="mt-1 text-xs text-slate-500">
+        Preview of uploaded CSV — showing {rows.length} of {totalRows} row{totalRows === 1 ? "" : "s"} (capped for
+        performance).
+      </p>
+      <div className="mt-3 max-h-[min(60vh,520px)] overflow-auto rounded-xl border border-slate-100">
+        <table className="w-full min-w-max border-collapse text-left text-xs">
+          <thead className="sticky top-0 z-10 bg-slate-100 shadow-sm">
+            <tr>
+              {cols.map((c) => (
+                <th
+                  key={c}
+                  className="whitespace-nowrap border-b border-slate-200 px-2 py-2 font-semibold text-slate-800"
+                >
+                  {c}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="text-slate-700">
+            {rows.map((r, i) => (
+              <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/80">
+                {cols.map((c) => (
+                  <td key={c} className="max-w-[16rem] truncate px-2 py-1.5 align-top font-mono text-[11px]">
+                    {formatDatasetCell(r[c])}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 type ConsoleSection = "overview" | "alerts" | "evidence" | "assistant";
 
 const SECTION_META: Record<ConsoleSection, { title: string; subtitle: string }> = {
   overview: {
     title: "Overview",
-    subtitle: "Ingest billing data, see run metrics, and review recorded feedback.",
+    subtitle: "Ingest billing data, inspect the loaded dataset, and see run metrics.",
   },
   alerts: {
     title: "Anomaly alerts",
@@ -54,7 +99,7 @@ const SECTION_META: Record<ConsoleSection, { title: string; subtitle: string }> 
 };
 
 const CONSOLE_NAV: { id: ConsoleSection; label: string; hint: string }[] = [
-  { id: "overview", label: "Overview", hint: "Upload, stats, feedback" },
+  { id: "overview", label: "Overview", hint: "Upload, stats, dataset" },
   { id: "alerts", label: "Alerts", hint: "Anomaly list" },
   { id: "evidence", label: "Evidence", hint: "RAG evidence & actions" },
   { id: "assistant", label: "Assistant", hint: "NLP chat" },
@@ -67,26 +112,7 @@ export default function App() {
   const [run, setRun] = useState<AnalysisRun | null>(null);
   const [selected, setSelected] = useState<Anomaly | null>(null);
 
-  const [feedbackRows, setFeedbackRows] = useState<FeedbackListItem[]>([]);
-  const [feedbackLoading, setFeedbackLoading] = useState(false);
-
   const [consoleSection, setConsoleSection] = useState<ConsoleSection>("overview");
-
-  const loadFeedback = useCallback(async () => {
-    setFeedbackLoading(true);
-    try {
-      const rows = await fetchFeedbackList(50);
-      setFeedbackRows(rows);
-    } catch {
-      /* non-fatal */
-    } finally {
-      setFeedbackLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadFeedback();
-  }, [loadFeedback]);
 
   const onUpload = useCallback(async () => {
     if (!file) {
@@ -163,7 +189,6 @@ export default function App() {
               onClick={async () => {
                 try {
                   await postFeedback(selected.id, "approve");
-                  await loadFeedback();
                 } catch (e) {
                   setError(e instanceof Error ? e.message : String(e));
                 }
@@ -177,7 +202,6 @@ export default function App() {
               onClick={async () => {
                 try {
                   await postFeedback(selected.id, "dismiss");
-                  await loadFeedback();
                 } catch (e) {
                   setError(e instanceof Error ? e.message : String(e));
                 }
@@ -362,7 +386,9 @@ export default function App() {
                   </section>
                 )}
 
-                <FeedbackFeed items={feedbackRows} loading={feedbackLoading} />
+                {run && run.input_preview.length > 0 && (
+                  <DatasetPreviewTable rows={run.input_preview} totalRows={run.total_rows} />
+                )}
 
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-4 text-sm text-slate-600">
                   <span className="font-medium text-slate-800">Next:</span> open{" "}

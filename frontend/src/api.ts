@@ -27,6 +27,8 @@ export type AnalysisRun = {
   created_at: string;
   anomalies: Anomaly[];
   raw_summary: Record<string, unknown> | null;
+  /** Capped sample of uploaded CSV rows for table preview */
+  input_preview: Array<Record<string, unknown>>;
 };
 
 export async function analyzeCsv(file: File): Promise<AnalysisRun> {
@@ -118,22 +120,6 @@ export async function nlpQueryStream(
       }
     }
   }
-}
-
-export type FeedbackListItem = {
-  id: string;
-  anomaly_id: string;
-  order_id: string | null;
-  action: string;
-  notes: string | null;
-  created_at: string;
-};
-
-export async function fetchFeedbackList(limit = 50): Promise<FeedbackListItem[]> {
-  const res = await client.get<FeedbackListItem[]>("/api/feedback", {
-    params: { limit },
-  });
-  return res.data;
 }
 
 export async function postFeedback(

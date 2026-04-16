@@ -29,6 +29,8 @@ class AnalysisRunOut(BaseModel):
     created_at: datetime
     anomalies: list[AnomalyOut] = Field(default_factory=list)
     raw_summary: dict[str, Any] | None = None
+    # Sample of uploaded CSV rows (JSON-safe) for UI preview; capped server-side
+    input_preview: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ChatMessageIn(BaseModel):
