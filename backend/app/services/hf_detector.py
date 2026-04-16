@@ -48,6 +48,7 @@ def run_hf_space_on_csv(csv_path: str) -> dict[str, Any]:
     """
     settings = get_settings()
     url = settings.hf_space_url.rstrip("/")
+    logger.info("Calling Hugging Face Space %s with CSV %s", url, csv_path)
     try:
         client = Client(url, verbose=False)
     except Exception as e:
@@ -235,12 +236,41 @@ def _heuristic_six_types(df: pd.DataFrame) -> list[dict[str, Any]]:
     return rows
 
 
+def _coerce_bool(v: Any) -> bool:
+    if v is True:
+        return True
+    if v is False or v is None:
+        return False
+    if isinstance(v, (int, float)):
+        return bool(v) and v != 0
+    s = str(v).strip().lower()
+    return s in ("true", "yes", "1", "y")
+
+
+def _header_index(headers: list[Any]) -> dict[str, int]:
+    return {str(h): i for i, h in enumerate(headers)}
+
+
+def _pick_col(
+    header_index: dict[str, int],
+    names: tuple[str, ...],
+) -> int | None:
+    for n in names:
+        if n in header_index:
+            return header_index[n]
+    return None
+
+
 def extract_anomaly_rows(
     df: pd.DataFrame, hf_out: dict[str, Any]
 ) -> list[dict[str, Any]]:
     """
     Build per-row anomaly structures from HF preview/summary.
     Falls back to heuristics if the model returns only aggregate JSON.
+
+    Hugging Face Gradio Spaces (e.g. luca1028-anomaly-detector) typically return a
+    preview Dataframe with columns like: final_score, is_anomaly, scores (dict).
+    Older parsers only looked for anomaly_score / anomaly_type and dropped all rows.
     """
     preview = hf_out.get("preview") or {}
     summary = normalize_hf_summary(hf_out.get("summary"))
@@ -254,43 +284,107 @@ def extract_anomaly_rows(
     headers = preview.get("headers") or list(df.columns)
     data = preview.get("data")
     if isinstance(data, list) and data:
-        header_index = {h: i for i, h in enumerate(headers)}
-        score_col = None
-        type_col = None
-        for cand in ("anomaly_score", "score", "anomaly", "prediction"):
-            if cand in header_index:
-                score_col = header_index[cand]
-                break
-        for cand in ("anomaly_type", "type", "label", "reason"):
-            if cand in header_index:
-                type_col = header_index[cand]
-                break
-
-        # Avoid treating every preview row as anomalous when model columns are absent
-        if score_col is None and type_col is None:
-            data = []
+        hi = _header_index(headers)
+        is_anomaly_col = _pick_col(
+            hi,
+            ("is_anomaly", "anomaly_flag", "predicted_anomaly", "is_anomalous"),
+        )
+        score_col = _pick_col(
+            hi,
+            (
+                "final_score",
+                "anomaly_score",
+                "score",
+                "anomaly",
+                "prediction",
+            ),
+        )
+        type_col = _pick_col(
+            hi,
+            ("anomaly_type", "type", "label", "reason", "category"),
+        )
+        scores_col = _pick_col(hi, ("scores", "score_components", "component_scores"))
 
         for i, row in enumerate(data):
             if not isinstance(row, (list, tuple)):
                 continue
-            score = float(row[score_col]) if score_col is not None and score_col < len(row) else None
-            atype = str(row[type_col]) if type_col is not None and type_col < len(row) else "model_output"
-            is_anom = True
-            if score is not None:
-                is_anom = score > 0.5 or (score < 0 and score != 0)
 
-            if not is_anom and atype in ("normal", "ok", "0"):
+            is_anom = False
+            if is_anomaly_col is not None and is_anomaly_col < len(row):
+                is_anom = _coerce_bool(row[is_anomaly_col])
+            elif score_col is not None and score_col < len(row):
+                try:
+                    is_anom = float(row[score_col]) > 0.5
+                except (TypeError, ValueError):
+                    is_anom = False
+            elif type_col is not None and type_col < len(row):
+                at = str(row[type_col]).strip().lower()
+                is_anom = bool(at) and at not in ("normal", "ok", "0", "benign", "negative")
+            else:
                 continue
 
-            oid = row[header_index["order_id"]] if "order_id" in header_index else None
+            if not is_anom:
+                continue
+
+            final_score: float | None = None
+            if score_col is not None and score_col < len(row):
+                try:
+                    final_score = float(row[score_col])
+                except (TypeError, ValueError):
+                    final_score = None
+
+            atype = "hf_model_anomaly"
+            if type_col is not None and type_col < len(row):
+                atype = str(row[type_col]) or atype
+            elif scores_col is not None and scores_col < len(row) and isinstance(
+                row[scores_col], dict
+            ):
+                comp = row[scores_col]
+                if isinstance(comp, dict) and comp:
+                    top = max(comp.items(), key=lambda kv: float(kv[1] or 0))
+                    atype = f"hf_{top[0]}"
+
+            oid = None
+            if "order_id" in hi and hi["order_id"] < len(row):
+                oid = row[hi["order_id"]]
+
+            scores_obj: Any = None
+            if scores_col is not None and scores_col < len(row):
+                scores_obj = row[scores_col]
+
+            expl_parts = [
+                "Flagged by Hugging Face anomaly detector.",
+            ]
+            if final_score is not None:
+                expl_parts.append(f"final_score={final_score:.4f}.")
+            if isinstance(scores_obj, dict) and scores_obj:
+                parts: list[str] = []
+                for k, v in scores_obj.items():
+                    if v is None:
+                        continue
+                    try:
+                        parts.append(f"{k}={float(v):.4f}")
+                    except (TypeError, ValueError):
+                        parts.append(f"{k}={v!r}")
+                if parts:
+                    expl_parts.append("Components: " + ", ".join(parts))
+
             rows.append(
                 {
                     "row_index": i,
                     "order_id": str(oid) if oid is not None else None,
                     "anomaly_type": atype,
-                    "severity": "high" if score and score > 0.8 else "medium",
-                    "explanation": summary.get("explanation") or f"Flagged by model ({atype})",
-                    "model_payload": {"preview_row": row, "headers": headers},
+                    "severity": "high"
+                    if (final_score is not None and final_score > 0.8)
+                    else "medium",
+                    "explanation": " ".join(expl_parts),
+                    "model_payload": {
+                        "source": "huggingface_space",
+                        "preview_row": row,
+                        "headers": headers,
+                        "scores": scores_obj,
+                        "summary": summary,
+                    },
                 }
             )
 

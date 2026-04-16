@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -27,6 +28,8 @@ class Settings(BaseSettings):
     mlflow_tracking_uri: str = MLRUNS_DIR.as_uri()
     mlflow_experiment_name: str = "billing_anomaly"
     use_mock_ai: bool = False
+    # auto: try Sentence Transformers + PyTorch; hash: deterministic vectors only (avoids torch DLL issues on Windows)
+    embedding_backend: Literal["auto", "hash"] = "auto"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     @property
