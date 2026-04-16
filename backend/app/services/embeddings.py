@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 _MODEL = None
 _ST_LOAD_FAILED = False
+_EMBEDDING_LOGGED = False
 
 
 def _fallback_vector(text: str, dim: int = 384) -> np.ndarray:
@@ -33,7 +34,32 @@ def _should_try_sentence_transformers() -> bool:
     settings = get_settings()
     if getattr(settings, "use_mock_ai", False):
         return False
+    if getattr(settings, "embedding_backend", "auto") == "hash":
+        return False
     return True
+
+
+def _log_embedding_mode_once(msg: str, *args: object) -> None:
+    global _EMBEDDING_LOGGED
+    if _EMBEDDING_LOGGED:
+        return
+    _EMBEDDING_LOGGED = True
+    logger.info(msg, *args)
+
+
+def _pytorch_usable() -> bool:
+    """Avoid importing sentence_transformers if torch cannot load (common on Windows DLL issues)."""
+    try:
+        import torch
+
+        _ = torch.tensor([1.0], dtype=torch.float32)
+        return True
+    except Exception as e:
+        _log_embedding_mode_once(
+            "PyTorch not usable (%s); using deterministic embeddings for contract RAG.",
+            e,
+        )
+        return False
 
 
 def get_embedder():
@@ -44,6 +70,13 @@ def get_embedder():
         return _MODEL
     if not _should_try_sentence_transformers():
         _ST_LOAD_FAILED = True
+        if getattr(get_settings(), "embedding_backend", "auto") == "hash":
+            _log_embedding_mode_once(
+                "Embeddings: embedding_backend=hash (deterministic vectors; no PyTorch)."
+            )
+        return None
+    if not _pytorch_usable():
+        _ST_LOAD_FAILED = True
         return None
     try:
         from sentence_transformers import SentenceTransformer
@@ -51,7 +84,7 @@ def get_embedder():
         _MODEL = SentenceTransformer(_model_name())
         logger.info("Loaded SentenceTransformer model %s", _model_name())
     except Exception as e:
-        logger.warning(
+        _log_embedding_mode_once(
             "SentenceTransformer unavailable (%s); using deterministic fallback embeddings.",
             e,
         )
@@ -69,7 +102,7 @@ def embed_texts(texts: list[str]) -> np.ndarray:
             emb = model.encode(texts, normalize_embeddings=True)
             return np.asarray(emb, dtype=np.float32)
         except Exception as e:
-            logger.warning("SentenceTransformer encode failed; fallback: %s", e)
+            logger.info("SentenceTransformer encode failed; using hash fallback: %s", e)
 
     out = np.stack([_fallback_vector(t) for t in texts])
     return out.astype(np.float32)
