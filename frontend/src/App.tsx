@@ -1,7 +1,8 @@
-import type { ReactNode } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { analyzeCsv, postFeedback, type AnalysisRun, type Anomaly } from "./api";
 import ChatAssistant from "./components/ChatAssistant";
+import { parseCsvForPreview } from "./csvPreview";
 
 function Badge({ children, tone }: { children: ReactNode; tone: "red" | "amber" | "blue" | "slate" }) {
   const map = {
@@ -145,6 +146,11 @@ const CONSOLE_NAV: { id: ConsoleSection; label: string; hint: string }[] = [
 
 export default function App() {
   const [file, setFile] = useState<File | null>(null);
+  /** Parsed locally when a CSV is chosen (before Run analysis). */
+  const [csvPreview, setCsvPreview] = useState<{
+    rows: Record<string, unknown>[];
+    totalRows: number;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [run, setRun] = useState<AnalysisRun | null>(null);
@@ -161,6 +167,34 @@ export default function App() {
     const id = window.setTimeout(() => setFeedbackToast(null), 4200);
     return () => window.clearTimeout(id);
   }, [feedbackToast]);
+
+  const onCsvFileChange = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0] ?? null;
+    setFile(f);
+    setCsvPreview(null);
+    setRun(null);
+    setSelected(null);
+    if (!f) {
+      setError(null);
+      return;
+    }
+    if (!f.name.toLowerCase().endsWith(".csv")) {
+      setError("Please choose a .csv file.");
+      return;
+    }
+    try {
+      const text = await f.text();
+      const parsed = parseCsvForPreview(text);
+      if (!parsed || parsed.rows.length === 0) {
+        setError("Could not parse CSV (empty or missing header row).");
+        return;
+      }
+      setCsvPreview(parsed);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to read file");
+    }
+  }, []);
 
   const onUpload = useCallback(async () => {
     if (!file) {
@@ -194,6 +228,16 @@ export default function App() {
       rate: run.total_rows ? ((run.anomaly_count / run.total_rows) * 100).toFixed(1) : "0",
     };
   }, [run]);
+
+  const datasetPreview = useMemo(() => {
+    if (run?.input_preview?.length) {
+      return { rows: run.input_preview, totalRows: run.total_rows };
+    }
+    if (csvPreview?.rows.length) {
+      return { rows: csvPreview.rows, totalRows: csvPreview.totalRows };
+    }
+    return null;
+  }, [run, csvPreview]);
 
   const meta = SECTION_META[consoleSection];
 
@@ -406,7 +450,7 @@ export default function App() {
                           type="file"
                           accept=".csv"
                           className="hidden"
-                          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                          onChange={onCsvFileChange}
                         />
                         Choose CSV
                       </label>
@@ -444,8 +488,8 @@ export default function App() {
                   </section>
                 )}
 
-                {run && run.input_preview.length > 0 && (
-                  <DatasetPreviewTable rows={run.input_preview} totalRows={run.total_rows} />
+                {datasetPreview && (
+                  <DatasetPreviewTable rows={datasetPreview.rows} totalRows={datasetPreview.totalRows} />
                 )}
 
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-4 text-sm text-slate-600">
