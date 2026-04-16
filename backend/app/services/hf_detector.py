@@ -27,7 +27,6 @@ EXPECTED_COLUMNS = [
     "payment_method",
     "country",
     "city",
-    "is_fraud",
 ]
 
 
@@ -217,21 +216,22 @@ def _heuristic_six_types(df: pd.DataFrame) -> list[dict[str, Any]]:
                 }
             )
 
-        try:
-            fraud = int(r.get("is_fraud", 0) or 0) == 1
-        except (TypeError, ValueError):
-            fraud = str(r.get("is_fraud", "")).lower() in ("true", "yes", "1")
-        if fraud:
-            rows.append(
-                {
-                    "row_index": i,
-                    "order_id": oid or None,
-                    "anomaly_type": "fraud_signal",
-                    "severity": "high",
-                    "explanation": "Fraud indicator column set for this row.",
-                    "model_payload": {"source": "heuristic", "rule": "is_fraud"},
-                }
-            )
+        if "is_fraud" in df.columns:
+            try:
+                fraud = int(r.get("is_fraud", 0) or 0) == 1
+            except (TypeError, ValueError):
+                fraud = str(r.get("is_fraud", "")).lower() in ("true", "yes", "1")
+            if fraud:
+                rows.append(
+                    {
+                        "row_index": i,
+                        "order_id": oid or None,
+                        "anomaly_type": "fraud_signal",
+                        "severity": "high",
+                        "explanation": "Fraud indicator column set for this row.",
+                        "model_payload": {"source": "heuristic", "rule": "is_fraud"},
+                    }
+                )
 
     return rows
 
