@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 def classify_intent(question: str) -> str:
     q = question.lower().strip()
-    if re.search(r"\b(how many|count|total)\b.*\b(anomal|alert|issue)", q):
+    if re.search(r"\b(how many|count|total)\b.*\b(anomaly|anomalies|issue)", q):
         return "count_anomalies"
     if re.search(r"\b(list|show|which)\b.*\b(high|severity)", q):
         return "list_high_severity"
