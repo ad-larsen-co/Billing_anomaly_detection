@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { analyzeCsv, postFeedback, type AnalysisRun, type Anomaly } from "./api";
 import ChatAssistant from "./components/ChatAssistant";
 
@@ -22,6 +22,44 @@ function severityTone(s: string): "red" | "amber" | "blue" | "slate" {
   if (s === "medium") return "amber";
   if (s === "low") return "blue";
   return "slate";
+}
+
+const FEEDBACK_THUMBS_UP = "/feedback-thumbs-up.png";
+const FEEDBACK_THUMBS_DOWN = "/feedback-thumbs-down.png";
+
+function FeedbackThumbImage({
+  variant,
+  className,
+}: {
+  variant: "up" | "down";
+  className?: string;
+}) {
+  return (
+    <img
+      src={variant === "up" ? FEEDBACK_THUMBS_UP : FEEDBACK_THUMBS_DOWN}
+      alt=""
+      className={`object-contain ${className ?? ""}`}
+      draggable={false}
+    />
+  );
+}
+
+function IconAlertCircle(props: { className?: string }) {
+  return (
+    <svg
+      className={props.className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 8v4M12 16h.01" />
+    </svg>
+  );
 }
 
 function formatDatasetCell(v: unknown): string {
@@ -114,6 +152,16 @@ export default function App() {
 
   const [consoleSection, setConsoleSection] = useState<ConsoleSection>("overview");
 
+  const [feedbackToast, setFeedbackToast] = useState<{ message: string; tone: "success" | "error" } | null>(
+    null
+  );
+
+  useEffect(() => {
+    if (!feedbackToast) return;
+    const id = window.setTimeout(() => setFeedbackToast(null), 4200);
+    return () => window.clearTimeout(id);
+  }, [feedbackToast]);
+
   const onUpload = useCallback(async () => {
     if (!file) {
       setError("Choose a CSV file first.");
@@ -182,32 +230,42 @@ export default function App() {
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-slate-900">Details</h2>
         {selected && (
-          <div className="flex gap-2">
+          <div className="flex items-center gap-1">
             <button
               type="button"
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              title="Approve"
+              aria-label="Approve anomaly"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 ring-emerald-100 transition hover:bg-emerald-100 hover:ring-1 focus:outline-none focus:ring-2 focus:ring-emerald-400"
               onClick={async () => {
                 try {
                   await postFeedback(selected.id, "approve");
+                  setFeedbackToast({ message: "Feedback saved: approved.", tone: "success" });
                 } catch (e) {
-                  setError(e instanceof Error ? e.message : String(e));
+                  const msg = e instanceof Error ? e.message : String(e);
+                  setError(msg);
+                  setFeedbackToast({ message: `Could not save feedback: ${msg}`, tone: "error" });
                 }
               }}
             >
-              Approve
+              <FeedbackThumbImage variant="up" className="h-5 w-5 opacity-90" />
             </button>
             <button
               type="button"
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              title="Dismiss"
+              aria-label="Dismiss anomaly"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 ring-slate-100 transition hover:bg-slate-50 hover:ring-1 focus:outline-none focus:ring-2 focus:ring-slate-400"
               onClick={async () => {
                 try {
                   await postFeedback(selected.id, "dismiss");
+                  setFeedbackToast({ message: "Feedback saved: dismissed.", tone: "success" });
                 } catch (e) {
-                  setError(e instanceof Error ? e.message : String(e));
+                  const msg = e instanceof Error ? e.message : String(e);
+                  setError(msg);
+                  setFeedbackToast({ message: `Could not save feedback: ${msg}`, tone: "error" });
                 }
               }}
             >
-              Dismiss
+              <FeedbackThumbImage variant="down" className="h-5 w-5 opacity-90" />
             </button>
           </div>
         )}
@@ -470,6 +528,32 @@ export default function App() {
           </div>
         </main>
       </div>
+
+      {feedbackToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`fixed bottom-4 right-4 z-[100] flex max-w-sm items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-lg ${
+            feedbackToast.tone === "success"
+              ? "border-emerald-200 bg-white text-emerald-950"
+              : "border-rose-200 bg-white text-rose-950"
+          }`}
+        >
+          <span
+            className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
+              feedbackToast.tone === "success" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
+            }`}
+            aria-hidden
+          >
+            {feedbackToast.tone === "success" ? (
+              <FeedbackThumbImage variant="up" className="h-4 w-4" />
+            ) : (
+              <IconAlertCircle className="h-3.5 w-3.5" />
+            )}
+          </span>
+          <span className="leading-snug">{feedbackToast.message}</span>
+        </div>
+      )}
     </div>
   );
 }
