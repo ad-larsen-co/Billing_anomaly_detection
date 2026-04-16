@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import json
 import logging
+from typing import Any
 from uuid import UUID
 
+import pandas as pd
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.database import session_scope
@@ -17,8 +20,21 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["analyze"])
 
+_PREVIEW_ROW_CAP = 200
 
-def _serialize_run(run: AnalysisRun) -> AnalysisRunOut:
+
+def _input_preview_records(df: pd.DataFrame) -> list[dict[str, Any]]:
+    """JSON-serializable row dicts for the UI table (bounded size)."""
+    if df.empty:
+        return []
+    chunk = df.head(_PREVIEW_ROW_CAP)
+    return json.loads(chunk.to_json(orient="records", date_format="iso"))
+
+
+def _serialize_run(
+    run: AnalysisRun,
+    input_preview: list[dict[str, Any]] | None = None,
+) -> AnalysisRunOut:
     anomalies: list[AnomalyOut] = []
     for a in run.anomalies:
         anomalies.append(
@@ -44,6 +60,7 @@ def _serialize_run(run: AnalysisRun) -> AnalysisRunOut:
         created_at=run.created_at,
         anomalies=anomalies,
         raw_summary=run.raw_summary,
+        input_preview=input_preview if input_preview is not None else [],
     )
 
 
@@ -55,6 +72,7 @@ async def analyze_csv(file: UploadFile = File(...)) -> AnalysisRunOut:
     try:
         contents = await file.read()
         df, hf_out = analyze_uploaded_csv(contents, file.filename)
+        input_preview = _input_preview_records(df)
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=e.message) from e
     except AppError as e:
@@ -73,7 +91,7 @@ async def analyze_csv(file: UploadFile = File(...)) -> AnalysisRunOut:
                 .filter(AnalysisRun.id == run.id)
                 .one()
             )
-            return _serialize_run(run)
+            return _serialize_run(run, input_preview=input_preview)
     except AppError as e:
         raise HTTPException(status_code=500, detail=e.message) from e
     except Exception as e:
