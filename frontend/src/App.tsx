@@ -1,12 +1,15 @@
 import type { ReactNode } from "react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   analyzeCsv,
-  nlpQuery,
+  fetchFeedbackList,
   postFeedback,
   type AnalysisRun,
   type Anomaly,
+  type FeedbackListItem,
 } from "./api";
+import ChatAssistant from "./components/ChatAssistant";
+import FeedbackFeed from "./components/FeedbackFeed";
 
 function Badge({ children, tone }: { children: ReactNode; tone: "red" | "amber" | "blue" | "slate" }) {
   const map = {
@@ -36,9 +39,24 @@ export default function App() {
   const [run, setRun] = useState<AnalysisRun | null>(null);
   const [selected, setSelected] = useState<Anomaly | null>(null);
 
-  const [chat, setChat] = useState("");
-  const [chatLog, setChatLog] = useState<{ q: string; a: string }[]>([]);
-  const [chatBusy, setChatBusy] = useState(false);
+  const [feedbackRows, setFeedbackRows] = useState<FeedbackListItem[]>([]);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+
+  const loadFeedback = useCallback(async () => {
+    setFeedbackLoading(true);
+    try {
+      const rows = await fetchFeedbackList(50);
+      setFeedbackRows(rows);
+    } catch {
+      /* non-fatal */
+    } finally {
+      setFeedbackLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadFeedback();
+  }, [loadFeedback]);
 
   const onUpload = useCallback(async () => {
     if (!file) {
@@ -61,22 +79,6 @@ export default function App() {
       setLoading(false);
     }
   }, [file]);
-
-  const onAsk = async () => {
-    if (!chat.trim()) return;
-    setChatBusy(true);
-    setError(null);
-    try {
-      const res = await nlpQuery(chat.trim());
-      setChatLog((prev) => [...prev, { q: chat.trim(), a: res.answer }]);
-      setChat("");
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
-    } finally {
-      setChatBusy(false);
-    }
-  };
 
   const anomalies = run?.anomalies ?? [];
 
@@ -186,6 +188,8 @@ export default function App() {
               </section>
             )}
 
+            <FeedbackFeed items={feedbackRows} loading={feedbackLoading} />
+
             <div className="grid gap-6 lg:grid-cols-5">
               <section className="lg:col-span-2">
                 <div className="mb-3 flex items-center justify-between">
@@ -231,6 +235,7 @@ export default function App() {
                         onClick={async () => {
                           try {
                             await postFeedback(selected.id, "approve");
+                            await loadFeedback();
                           } catch (e) {
                             setError(e instanceof Error ? e.message : String(e));
                           }
@@ -244,6 +249,7 @@ export default function App() {
                         onClick={async () => {
                           try {
                             await postFeedback(selected.id, "dismiss");
+                            await loadFeedback();
                           } catch (e) {
                             setError(e instanceof Error ? e.message : String(e));
                           }
@@ -311,42 +317,8 @@ export default function App() {
                   )}
                 </div>
 
-                <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="mb-3 flex items-center justify-between">
-                    <h2 className="text-sm font-semibold text-slate-900">Natural language assistant</h2>
-                    <Badge tone="blue">GPT‑4o‑mini</Badge>
-                  </div>
-                  <div className="max-h-56 space-y-3 overflow-y-auto rounded-xl bg-slate-50 p-3 text-sm">
-                    {chatLog.length === 0 && (
-                      <div className="text-slate-500">
-                        Try: “How many anomalies were detected?”, “List high severity alerts”, “What does the
-                        contract say about tax?”
-                      </div>
-                    )}
-                    {chatLog.map((c, i) => (
-                      <div key={i} className="space-y-1">
-                        <div className="font-medium text-slate-900">Q: {c.q}</div>
-                        <div className="text-slate-700">A: {c.a}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-3 flex gap-2">
-                    <input
-                      className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none ring-blue-100 focus:ring-2"
-                      placeholder="Ask about anomalies, contracts, or recent runs…"
-                      value={chat}
-                      onChange={(e) => setChat(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && onAsk()}
-                    />
-                    <button
-                      type="button"
-                      onClick={onAsk}
-                      disabled={chatBusy}
-                      className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
-                    >
-                      {chatBusy ? "…" : "Ask"}
-                    </button>
-                  </div>
+                <div className="mt-6">
+                  <ChatAssistant />
                 </div>
               </section>
             </div>
