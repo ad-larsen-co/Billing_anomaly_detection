@@ -499,7 +499,7 @@ export default function App() {
                     className="font-semibold text-blue-700 underline decoration-blue-200 underline-offset-2 hover:text-blue-900"
                     onClick={() => setConsoleSection("alerts")}
                   >
-                    Alerts
+                    Anomalies
                   </button>{" "}
                   to review findings,{" "}
                   <button

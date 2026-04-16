@@ -1,3 +1,4 @@
+import type { MouseEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   nlpQueryStream,
@@ -73,6 +74,34 @@ export default function ChatAssistant() {
     setError(null);
     setLastMeta(null);
   };
+
+  const onDeleteSession = useCallback(
+    (e: MouseEvent, id: string) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setSessions((prev) => {
+        const idx = prev.findIndex((s) => s.id === id);
+        const next = prev.filter((s) => s.id !== id);
+        if (next.length === 0) {
+          const fresh = newSession();
+          setActiveId(fresh.id);
+          setInput("");
+          setError(null);
+          setLastMeta(null);
+          return [fresh];
+        }
+        if (id === activeId) {
+          const newActive = next[idx] ?? next[idx - 1] ?? next[0];
+          setActiveId(newActive.id);
+          setInput("");
+          setError(null);
+          setLastMeta(null);
+        }
+        return next;
+      });
+    },
+    [activeId]
+  );
 
   const onSend = async () => {
     const q = input.trim();
@@ -167,21 +196,45 @@ export default function ChatAssistant() {
         </button>
         <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
           {sessions.map((s) => (
-            <button
+            <div
               key={s.id}
-              type="button"
-              onClick={() => onSelectSession(s.id)}
-              className={`w-full rounded-lg px-2 py-2 text-left text-xs transition ${
+              className={`group flex min-w-0 items-stretch gap-0.5 rounded-lg transition ${
                 s.id === activeId
-                  ? "bg-white font-medium text-slate-900 shadow-sm ring-1 ring-slate-200"
-                  : "text-slate-600 hover:bg-white/80"
+                  ? "bg-white shadow-sm ring-1 ring-slate-200"
+                  : "hover:bg-white/80"
               }`}
             >
-              <div className="line-clamp-2">{s.title}</div>
-              <div className="mt-0.5 text-[10px] text-slate-400">
-                {formatChatTime(s.updatedAt)}
-              </div>
-            </button>
+              <button
+                type="button"
+                onClick={() => onSelectSession(s.id)}
+                className={`min-w-0 flex-1 rounded-lg px-2 py-2 text-left text-xs ${
+                  s.id === activeId ? "font-medium text-slate-900" : "text-slate-600"
+                }`}
+              >
+                <div className="line-clamp-2">{s.title}</div>
+                <div className="mt-0.5 text-[10px] text-slate-400">
+                  {formatChatTime(s.updatedAt)}
+                </div>
+              </button>
+              <button
+                type="button"
+                title="Delete session"
+                aria-label={`Delete session: ${s.title}`}
+                onClick={(e) => onDeleteSession(e, s.id)}
+                className="flex shrink-0 items-center justify-center rounded-lg px-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  className="h-4 w-4"
+                  aria-hidden
+                >
+                  <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14zM10 11v6M14 11v6" />
+                </svg>
+              </button>
+            </div>
           ))}
         </div>
       </aside>
