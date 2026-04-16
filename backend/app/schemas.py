@@ -31,8 +31,15 @@ class AnalysisRunOut(BaseModel):
     raw_summary: dict[str, Any] | None = None
 
 
+class ChatMessageIn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(..., min_length=1, max_length=12000)
+
+
 class NLPQueryIn(BaseModel):
     question: str = Field(..., min_length=1, max_length=4000)
+    session_id: str | None = Field(None, max_length=128)
+    messages: list[ChatMessageIn] = Field(default_factory=list)
 
 
 class NLPQueryOut(BaseModel):
@@ -52,6 +59,16 @@ class FeedbackOut(BaseModel):
     id: UUID
     anomaly_id: UUID
     action: str
+    notes: str | None = None
+    created_at: datetime
+
+
+class FeedbackListItem(BaseModel):
+    id: UUID
+    anomaly_id: UUID
+    order_id: str | None
+    action: str
+    notes: str | None
     created_at: datetime
 
 
