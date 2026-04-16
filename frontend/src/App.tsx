@@ -32,6 +32,34 @@ function severityTone(s: string): "red" | "amber" | "blue" | "slate" {
   return "slate";
 }
 
+type ConsoleSection = "overview" | "alerts" | "evidence" | "assistant";
+
+const SECTION_META: Record<ConsoleSection, { title: string; subtitle: string }> = {
+  overview: {
+    title: "Overview",
+    subtitle: "Ingest billing data, see run metrics, and review recorded feedback.",
+  },
+  alerts: {
+    title: "Anomaly alerts",
+    subtitle: "Browse detected anomalies from the latest analysis run.",
+  },
+  evidence: {
+    title: "Evidence & remediation",
+    subtitle: "Contract evidence, solver playbook, and human feedback on each alert.",
+  },
+  assistant: {
+    title: "Assistant",
+    subtitle: "Ask questions about anomalies, contracts, and recent runs — streaming GPT‑4o‑mini.",
+  },
+};
+
+const CONSOLE_NAV: { id: ConsoleSection; label: string; hint: string }[] = [
+  { id: "overview", label: "Overview", hint: "Upload, stats, feedback" },
+  { id: "alerts", label: "Alerts", hint: "Anomaly list" },
+  { id: "evidence", label: "Evidence", hint: "RAG evidence & actions" },
+  { id: "assistant", label: "Assistant", hint: "NLP chat" },
+];
+
 export default function App() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -41,6 +69,8 @@ export default function App() {
 
   const [feedbackRows, setFeedbackRows] = useState<FeedbackListItem[]>([]);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+
+  const [consoleSection, setConsoleSection] = useState<ConsoleSection>("overview");
 
   const loadFeedback = useCallback(async () => {
     setFeedbackLoading(true);
@@ -91,39 +121,181 @@ export default function App() {
     };
   }, [run]);
 
+  const meta = SECTION_META[consoleSection];
+
+  const renderAnomalyList = (onPick: (a: Anomaly) => void) => (
+    <div className="max-h-[min(70vh,520px)] space-y-2 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+      {anomalies.length === 0 && (
+        <div className="px-3 py-8 text-center text-sm text-slate-500">
+          No anomalies yet. Go to <span className="font-medium text-slate-700">Overview</span> and run analysis on
+          a CSV.
+        </div>
+      )}
+      {anomalies.map((a) => (
+        <button
+          key={a.id}
+          type="button"
+          onClick={() => onPick(a)}
+          className={`w-full rounded-xl px-3 py-3 text-left transition hover:bg-slate-50 ${
+            selected?.id === a.id ? "bg-blue-50 ring-1 ring-blue-100" : ""
+          }`}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="font-mono text-xs text-slate-500">{a.order_id ?? `row ${a.row_index}`}</div>
+            <Badge tone={severityTone(a.severity)}>{a.severity}</Badge>
+          </div>
+          <div className="mt-1 text-sm font-medium text-slate-900">{a.anomaly_type}</div>
+          <div className="mt-1 line-clamp-2 text-xs text-slate-600">{a.explanation}</div>
+        </button>
+      ))}
+    </div>
+  );
+
+  const evidencePanel = (
+    <>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-slate-900">Details</h2>
+        {selected && (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              onClick={async () => {
+                try {
+                  await postFeedback(selected.id, "approve");
+                  await loadFeedback();
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : String(e));
+                }
+              }}
+            >
+              Approve
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              onClick={async () => {
+                try {
+                  await postFeedback(selected.id, "dismiss");
+                  await loadFeedback();
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : String(e));
+                }
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="min-h-[280px] rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        {!run && (
+          <div className="text-sm text-slate-500">
+            Run an analysis from <span className="font-medium text-slate-700">Overview</span> first.
+          </div>
+        )}
+        {run && !selected && (
+          <div className="text-sm text-slate-500">Select an alert from the list to view evidence and remediation.</div>
+        )}
+        {selected && (
+          <div className="space-y-4">
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Confidence</div>
+              <div className="mt-1 text-2xl font-semibold text-slate-900">
+                {(selected.confidence * 100).toFixed(1)}%
+              </div>
+            </div>
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Explanation</div>
+              <p className="mt-1 text-sm leading-relaxed text-slate-700">{selected.explanation ?? "—"}</p>
+            </div>
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Fact RAG · contract evidence</div>
+              <ul className="mt-2 space-y-2">
+                {(selected.evidence_refs ?? []).length === 0 && (
+                  <li className="text-sm text-slate-500">No snippets retrieved.</li>
+                )}
+                {(selected.evidence_refs ?? []).map((ev, idx) => (
+                  <li
+                    key={idx}
+                    className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+                  >
+                    <div className="text-xs font-semibold text-slate-900">{String(ev.title ?? "Clause")}</div>
+                    <div className="mt-1 whitespace-pre-wrap text-xs text-slate-600">{String(ev.excerpt ?? "")}</div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Solver RAG · playbook</div>
+              <div className="mt-2 whitespace-pre-wrap rounded-xl border border-blue-100 bg-blue-50/60 px-3 py-3 text-sm text-slate-800">
+                {selected.remediation ?? "—"}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <div className="flex min-h-screen">
-        <aside className="hidden w-64 flex-shrink-0 flex-col border-r border-slate-200 bg-white lg:flex">
+        <aside className="hidden w-64 flex-shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
           <div className="border-b border-slate-100 px-5 py-4">
             <div className="text-sm font-semibold text-slate-900">Billing Console</div>
             <div className="text-xs text-slate-500">Anomaly detection & RAG</div>
           </div>
-          <nav className="flex-1 space-y-1 px-3 py-4 text-sm">
-            <div className="rounded-lg bg-slate-100 px-3 py-2 font-medium text-slate-900">Overview</div>
-            <div className="px-3 py-2 text-slate-600">Alerts</div>
-            <div className="px-3 py-2 text-slate-600">Evidence</div>
-            <div className="px-3 py-2 text-slate-600">Assistant</div>
+          <nav className="flex flex-1 flex-col gap-1 px-3 py-4 text-sm">
+            {CONSOLE_NAV.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                title={item.hint}
+                onClick={() => setConsoleSection(item.id)}
+                className={`rounded-lg px-3 py-2 text-left transition ${
+                  consoleSection === item.id
+                    ? "bg-slate-100 font-medium text-slate-900"
+                    : "text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
           </nav>
           <div className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">
             FastAPI · pgvector · GPT‑4o‑mini
           </div>
         </aside>
 
-        <main className="flex-1">
+        <main className="min-w-0 flex-1">
           <header className="border-b border-slate-200 bg-white/80 backdrop-blur">
-            <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-              <div>
-                <h1 className="text-lg font-semibold tracking-tight text-slate-900">
-                  Billing anomaly workspace
-                </h1>
-                <p className="text-sm text-slate-500">
-                  Upload Oracle-style billing CSV, review model output, evidence, and remediation.
-                </p>
+            <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 sm:px-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h1 className="text-lg font-semibold tracking-tight text-slate-900">{meta.title}</h1>
+                  <p className="mt-0.5 text-sm text-slate-500">{meta.subtitle}</p>
+                </div>
+                <div className="hidden shrink-0 items-center gap-2 sm:flex">
+                  <Badge tone="blue">HF Space</Badge>
+                  <Badge tone="slate">Dual RAG</Badge>
+                </div>
               </div>
-              <div className="hidden items-center gap-2 sm:flex">
-                <Badge tone="blue">HF Space</Badge>
-                <Badge tone="slate">Dual RAG</Badge>
+              <div className="flex gap-1 overflow-x-auto pb-1 md:hidden">
+                {CONSOLE_NAV.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setConsoleSection(item.id)}
+                    className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                      consoleSection === item.id
+                        ? "bg-slate-900 text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
               </div>
             </div>
           </header>
@@ -135,193 +307,140 @@ export default function App() {
               </div>
             )}
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <h2 className="text-sm font-semibold text-slate-900">Data ingest</h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Required columns: order_id, customer_id, order_date, product_id, product_name, category,
-                    price, quantity, payment_method, country, city, is_fraud
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100">
-                    <input
-                      type="file"
-                      accept=".csv"
-                      className="hidden"
-                      onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                    />
-                    Choose CSV
-                  </label>
+            {consoleSection === "overview" && (
+              <>
+                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <h2 className="text-sm font-semibold text-slate-900">Data ingest</h2>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Required columns: order_id, customer_id, order_date, product_id, product_name, category,
+                        price, quantity, payment_method, country, city, is_fraud
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100">
+                        <input
+                          type="file"
+                          accept=".csv"
+                          className="hidden"
+                          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                        />
+                        Choose CSV
+                      </label>
+                      <button
+                        type="button"
+                        onClick={onUpload}
+                        disabled={loading}
+                        className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60"
+                      >
+                        {loading ? "Analyzing…" : "Run analysis"}
+                      </button>
+                    </div>
+                  </div>
+                  {file && (
+                    <div className="mt-3 text-xs text-slate-600">
+                      Selected: <span className="font-mono">{file.name}</span>
+                    </div>
+                  )}
+                </section>
+
+                {stats && (
+                  <section className="grid gap-4 sm:grid-cols-3">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <div className="text-xs font-medium text-slate-500">Rows processed</div>
+                      <div className="mt-2 text-2xl font-semibold text-slate-900">{stats.total}</div>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <div className="text-xs font-medium text-slate-500">Anomalies</div>
+                      <div className="mt-2 text-2xl font-semibold text-rose-600">{stats.hits}</div>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <div className="text-xs font-medium text-slate-500">Alert rate</div>
+                      <div className="mt-2 text-2xl font-semibold text-slate-900">{stats.rate}%</div>
+                    </div>
+                  </section>
+                )}
+
+                <FeedbackFeed items={feedbackRows} loading={feedbackLoading} />
+
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-4 text-sm text-slate-600">
+                  <span className="font-medium text-slate-800">Next:</span> open{" "}
                   <button
                     type="button"
-                    onClick={onUpload}
-                    disabled={loading}
-                    className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60"
+                    className="font-semibold text-blue-700 underline decoration-blue-200 underline-offset-2 hover:text-blue-900"
+                    onClick={() => setConsoleSection("alerts")}
                   >
-                    {loading ? "Analyzing…" : "Run analysis"}
-                  </button>
+                    Alerts
+                  </button>{" "}
+                  to review findings,{" "}
+                  <button
+                    type="button"
+                    className="font-semibold text-blue-700 underline decoration-blue-200 underline-offset-2 hover:text-blue-900"
+                    onClick={() => setConsoleSection("evidence")}
+                  >
+                    Evidence
+                  </button>{" "}
+                  for RAG detail, or{" "}
+                  <button
+                    type="button"
+                    className="font-semibold text-blue-700 underline decoration-blue-200 underline-offset-2 hover:text-blue-900"
+                    onClick={() => setConsoleSection("assistant")}
+                  >
+                    Assistant
+                  </button>{" "}
+                  to ask questions.
                 </div>
-              </div>
-              {file && (
-                <div className="mt-3 text-xs text-slate-600">
-                  Selected: <span className="font-mono">{file.name}</span>
-                </div>
-              )}
-            </section>
+              </>
+            )}
 
-            {stats && (
-              <section className="grid gap-4 sm:grid-cols-3">
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="text-xs font-medium text-slate-500">Rows processed</div>
-                  <div className="mt-2 text-2xl font-semibold text-slate-900">{stats.total}</div>
+            {consoleSection === "alerts" && (
+              <section>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-sm font-semibold text-slate-900">All alerts</h2>
+                  <span className="text-xs text-slate-500">{anomalies.length} items</span>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="text-xs font-medium text-slate-500">Anomalies</div>
-                  <div className="mt-2 text-2xl font-semibold text-rose-600">{stats.hits}</div>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="text-xs font-medium text-slate-500">Alert rate</div>
-                  <div className="mt-2 text-2xl font-semibold text-slate-900">{stats.rate}%</div>
-                </div>
+                {stats && (
+                  <div className="mb-4 grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                      <div className="text-[10px] font-medium uppercase text-slate-500">Rows</div>
+                      <div className="text-lg font-semibold text-slate-900">{stats.total}</div>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                      <div className="text-[10px] font-medium uppercase text-slate-500">Anomalies</div>
+                      <div className="text-lg font-semibold text-rose-600">{stats.hits}</div>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                      <div className="text-[10px] font-medium uppercase text-slate-500">Rate</div>
+                      <div className="text-lg font-semibold text-slate-900">{stats.rate}%</div>
+                    </div>
+                  </div>
+                )}
+                {renderAnomalyList((a) => {
+                  setSelected(a);
+                  setConsoleSection("evidence");
+                })}
               </section>
             )}
 
-            <FeedbackFeed items={feedbackRows} loading={feedbackLoading} />
+            {consoleSection === "evidence" && (
+              <div className="grid gap-6 lg:grid-cols-5">
+                <section className="lg:col-span-2">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h2 className="text-sm font-semibold text-slate-900">Pick an alert</h2>
+                    <span className="text-xs text-slate-500">{anomalies.length} items</span>
+                  </div>
+                  {renderAnomalyList((a) => setSelected(a))}
+                </section>
+                <section className="lg:col-span-3">{evidencePanel}</section>
+              </div>
+            )}
 
-            <div className="grid gap-6 lg:grid-cols-5">
-              <section className="lg:col-span-2">
-                <div className="mb-3 flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-slate-900">Anomaly alerts</h2>
-                  <span className="text-xs text-slate-500">{anomalies.length} items</span>
-                </div>
-                <div className="max-h-[520px] space-y-2 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
-                  {anomalies.length === 0 && (
-                    <div className="px-3 py-8 text-center text-sm text-slate-500">
-                      No anomalies yet. Upload a CSV to populate this list.
-                    </div>
-                  )}
-                  {anomalies.map((a) => (
-                    <button
-                      key={a.id}
-                      type="button"
-                      onClick={() => setSelected(a)}
-                      className={`w-full rounded-xl px-3 py-3 text-left transition hover:bg-slate-50 ${
-                        selected?.id === a.id ? "bg-blue-50 ring-1 ring-blue-100" : ""
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="font-mono text-xs text-slate-500">
-                          {a.order_id ?? `row ${a.row_index}`}
-                        </div>
-                        <Badge tone={severityTone(a.severity)}>{a.severity}</Badge>
-                      </div>
-                      <div className="mt-1 text-sm font-medium text-slate-900">{a.anomaly_type}</div>
-                      <div className="mt-1 line-clamp-2 text-xs text-slate-600">{a.explanation}</div>
-                    </button>
-                  ))}
-                </div>
+            {consoleSection === "assistant" && (
+              <section>
+                <ChatAssistant />
               </section>
-
-              <section className="lg:col-span-3">
-                <div className="mb-3 flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-slate-900">Evidence & remediation</h2>
-                  {selected && (
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                        onClick={async () => {
-                          try {
-                            await postFeedback(selected.id, "approve");
-                            await loadFeedback();
-                          } catch (e) {
-                            setError(e instanceof Error ? e.message : String(e));
-                          }
-                        }}
-                      >
-                        Approve
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                        onClick={async () => {
-                          try {
-                            await postFeedback(selected.id, "dismiss");
-                            await loadFeedback();
-                          } catch (e) {
-                            setError(e instanceof Error ? e.message : String(e));
-                          }
-                        }}
-                      >
-                        Dismiss
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div className="min-h-[320px] rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  {!selected && (
-                    <div className="text-sm text-slate-500">Select an alert to view details.</div>
-                  )}
-                  {selected && (
-                    <div className="space-y-4">
-                      <div>
-                        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                          Confidence
-                        </div>
-                        <div className="mt-1 text-2xl font-semibold text-slate-900">
-                          {(selected.confidence * 100).toFixed(1)}%
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                          Explanation
-                        </div>
-                        <p className="mt-1 text-sm leading-relaxed text-slate-700">
-                          {selected.explanation ?? "—"}
-                        </p>
-                      </div>
-                      <div>
-                        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                          Fact RAG · contract evidence
-                        </div>
-                        <ul className="mt-2 space-y-2">
-                          {(selected.evidence_refs ?? []).length === 0 && (
-                            <li className="text-sm text-slate-500">No snippets retrieved.</li>
-                          )}
-                          {(selected.evidence_refs ?? []).map((ev, idx) => (
-                            <li
-                              key={idx}
-                              className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-700"
-                            >
-                              <div className="text-xs font-semibold text-slate-900">
-                                {String(ev.title ?? "Clause")}
-                              </div>
-                              <div className="mt-1 whitespace-pre-wrap text-xs text-slate-600">
-                                {String(ev.excerpt ?? "")}
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div>
-                        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                          Solver RAG · playbook
-                        </div>
-                        <div className="mt-2 whitespace-pre-wrap rounded-xl border border-blue-100 bg-blue-50/60 px-3 py-3 text-sm text-slate-800">
-                          {selected.remediation ?? "—"}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-6">
-                  <ChatAssistant />
-                </div>
-              </section>
-            </div>
+            )}
           </div>
         </main>
       </div>
