@@ -397,7 +397,7 @@ export default function App() {
                       <h2 className="text-sm font-semibold text-slate-900">Data ingest</h2>
                       <p className="mt-1 text-sm text-slate-500">
                         Required columns: order_id, customer_id, order_date, product_id, product_name, category,
-                        price, quantity, payment_method, country, city, is_fraud
+                        price, quantity, payment_method, country, city
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">

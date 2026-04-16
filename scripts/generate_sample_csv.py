@@ -21,7 +21,6 @@ COLUMNS = [
     "payment_method",
     "country",
     "city",
-    "is_fraud",
 ]
 
 
@@ -32,7 +31,7 @@ def main() -> None:
     for i in range(2400):
         day = start + timedelta(days=random.randint(0, 300))
         fraud = 1 if random.random() < 0.03 else 0
-        price = round(random.uniform(5, 500) + (200 if fraud else 0), 2)
+        price = round(random.uniform(5, 500) + (200 if fraud else 0), 2)  # fraud only biases price, not a column
         rows.append(
             {
                 "order_id": f"ORD-{100000 + i}",
@@ -48,7 +47,6 @@ def main() -> None:
                 "payment_method": random.choice(["card", "wire", "paypal"]),
                 "country": random.choice(["US", "DE", "UK", "FR"]),
                 "city": random.choice(["New York", "Berlin", "London", "Paris"]),
-                "is_fraud": fraud,
             }
         )
 
