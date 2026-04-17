@@ -23,10 +23,10 @@ Separated **FastAPI backend** (`backend/`) and **React + Vite frontend** (`front
 ```powershell
 cd backend
 python -m pip install -r requirements.txt
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8010
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-If port `8000` is already used by another app on your machine, keep using `8010` (matches the frontend proxy).
+If port `8000` is already used by another app on your machine, keep using `8000` (matches the frontend proxy).
 
 **Frontend**:
 
@@ -36,7 +36,7 @@ npm install
 npm run dev
 ```
 
-Open the URL Vite prints (often `http://localhost:5173`). The dev server proxies `/api` and `/health` to `http://127.0.0.1:8010`.
+Open the URL Vite prints (often `http://localhost:5173`). The dev server proxies `/api` and `/health` to `http://127.0.0.1:8000`.
 
 ## Optional Postgres (pgvector)
 
@@ -53,4 +53,4 @@ Embeddings are stored as JSON arrays; you can migrate to native `vector` columns
 
 ## API docs
 
-With the backend running: `http://127.0.0.1:8010/docs`
+With the backend running: `http://127.0.0.1:8000/docs`
