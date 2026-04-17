@@ -1,6 +1,7 @@
 import type { ChangeEvent, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { analyzeCsv, postFeedback, type AnalysisRun, type Anomaly } from "./api";
+import { BrandLogoFull, BrandLogoMark, NavSectionIcon } from "./components/BrandLogo";
 import ChatAssistant from "./components/ChatAssistant";
 import { parseCsvForPreview } from "./csvPreview";
 
@@ -69,26 +70,66 @@ function formatDatasetCell(v: unknown): string {
   return String(v);
 }
 
+/** Map dataframe row index (matches preview row order) → one anomaly record for navigation. */
+function anomalyMapByRowIndex(anomalies: Anomaly[]): Map<number, Anomaly> {
+  const m = new Map<number, Anomaly>();
+  for (const a of anomalies) {
+    if (!m.has(a.row_index)) m.set(a.row_index, a);
+  }
+  return m;
+}
+
+function IconFlagFilled(props: { className?: string }) {
+  return (
+    <svg className={props.className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <rect x="4" y="3" width="2.25" height="18" rx="0.4" />
+      <path d="M8.25 5h11.5A1.25 1.25 0 0 1 21 6.25v5.5A1.25 1.25 0 0 1 19.75 13H8.25V5z" />
+    </svg>
+  );
+}
+
 function DatasetPreviewTable({
   rows,
   totalRows,
+  anomalyByRowIndex,
+  onAnomalyFlagClick,
 }: {
   rows: Record<string, unknown>[];
   totalRows: number;
+  /** When set, preview row index i matches server `row_index` for the same CSV row after analysis. */
+  anomalyByRowIndex?: Map<number, Anomaly> | null;
+  onAnomalyFlagClick?: (a: Anomaly) => void;
 }) {
   if (rows.length === 0) return null;
   const cols = Object.keys(rows[0] ?? {});
+  const showFlagCol = Boolean(anomalyByRowIndex?.size && onAnomalyFlagClick);
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm ring-1 ring-slate-900/[0.04]">
       <h2 className="text-base font-semibold text-slate-900">Input dataset</h2>
       <p className="mt-1.5 text-sm text-slate-500">
         Preview of uploaded CSV — showing {rows.length} of {totalRows} row{totalRows === 1 ? "" : "s"} (capped for
         performance).
+        {showFlagCol && (
+          <span className="text-slate-600">
+            {" "}
+            <span className="font-medium text-slate-700">Red flags</span> mark rows detected as anomalies; click a flag
+            to open that row in Anomalies.
+          </span>
+        )}
       </p>
       <div className="mt-4 max-h-[min(60vh,520px)] overflow-auto rounded-xl border border-slate-100">
         <table className="w-full min-w-max border-collapse text-left text-sm">
           <thead className="sticky top-0 z-10 bg-slate-100 shadow-sm">
             <tr>
+              {showFlagCol && (
+                <th
+                  scope="col"
+                  className="w-12 border-b border-slate-200 px-1 py-2.5 text-center font-semibold text-slate-500"
+                  title="Anomaly flag"
+                >
+                  <span className="sr-only">Anomaly</span>
+                </th>
+              )}
               {cols.map((c) => (
                 <th
                   key={c}
@@ -100,15 +141,35 @@ function DatasetPreviewTable({
             </tr>
           </thead>
           <tbody className="text-slate-700">
-            {rows.map((r, i) => (
-              <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/80">
-                {cols.map((c) => (
-                  <td key={c} className="max-w-[16rem] truncate px-3 py-2 align-top font-mono text-sm">
-                    {formatDatasetCell(r[c])}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {rows.map((r, i) => {
+              const flagged = showFlagCol ? anomalyByRowIndex?.get(i) : undefined;
+              return (
+                <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/80">
+                  {showFlagCol && (
+                    <td className="w-12 px-1 py-2 align-middle text-center">
+                      {flagged ? (
+                        <button
+                          type="button"
+                          onClick={() => onAnomalyFlagClick?.(flagged)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-400/60"
+                          title={`${flagged.anomaly_type} — open in Anomalies`}
+                          aria-label={`Open anomaly for row ${flagged.row_index} in Anomalies`}
+                        >
+                          <IconFlagFilled className="h-5 w-5 drop-shadow-sm" />
+                        </button>
+                      ) : (
+                        <span className="inline-block h-8 w-8" aria-hidden />
+                      )}
+                    </td>
+                  )}
+                  {cols.map((c) => (
+                    <td key={c} className="max-w-[16rem] truncate px-3 py-2 align-top font-mono text-sm">
+                      {formatDatasetCell(r[c])}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -239,6 +300,22 @@ export default function App() {
     return null;
   }, [run, csvPreview]);
 
+  /** Preview rows are `df.head(200)` from the run — row index `i` matches `Anomaly.row_index`. */
+  const anomalyByRowForPreview = useMemo(() => {
+    if (!run?.anomalies?.length || !datasetPreview) return null;
+    const m = anomalyMapByRowIndex(run.anomalies);
+    const n = datasetPreview.rows.length;
+    for (const idx of m.keys()) {
+      if (idx >= 0 && idx < n) return m;
+    }
+    return null;
+  }, [run?.anomalies, datasetPreview]);
+
+  const navigateToAnomalyFromPreview = useCallback((a: Anomaly) => {
+    setSelected(a);
+    setConsoleSection("anomalies");
+  }, []);
+
   const meta = SECTION_META[consoleSection];
 
   const renderAnomalyList = (onPick: (a: Anomaly) => void) => (
@@ -365,60 +442,64 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="app-backdrop min-h-screen text-slate-900">
       <div className="flex min-h-screen">
-        <aside className="hidden w-64 flex-shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
-          <div className="border-b border-slate-100 px-5 py-5">
-            <div className="text-base font-semibold text-slate-900">Billing Console</div>
-            <div className="mt-0.5 text-sm text-slate-500">Anomaly detection & RAG</div>
+        <aside className="hidden w-[17rem] flex-shrink-0 flex-col border-r border-slate-200/80 bg-white/95 shadow-[4px_0_32px_-12px_rgba(15,23,42,0.12)] backdrop-blur-md md:flex">
+          <div className="border-b border-slate-100/90 px-5 py-6">
+            <BrandLogoFull />
           </div>
-          <nav className="flex flex-1 flex-col gap-1.5 px-4 py-5 text-base">
+          <nav className="flex flex-1 flex-col gap-1 px-3 py-4 text-base" aria-label="Primary">
             {CONSOLE_NAV.map((item) => (
               <button
                 key={item.id}
                 type="button"
                 title={item.hint}
                 onClick={() => setConsoleSection(item.id)}
-                className={`rounded-lg px-3 py-2.5 text-left transition ${
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70 focus-visible:ring-offset-2 ${
                   consoleSection === item.id
-                    ? "bg-slate-100 font-medium text-slate-900"
-                    : "text-slate-600 hover:bg-slate-50"
+                    ? "bg-indigo-50 font-medium text-indigo-950 shadow-sm ring-1 ring-indigo-100/90"
+                    : "text-slate-600 hover:bg-slate-50/90 hover:text-slate-900"
                 }`}
               >
+                <NavSectionIcon id={item.id} />
                 {item.label}
               </button>
             ))}
           </nav>
-          <div className="border-t border-slate-100 px-5 py-4 text-sm text-slate-500">
+          <div className="border-t border-slate-100/90 px-5 py-4 text-xs leading-relaxed text-slate-500">
             FastAPI · pgvector · GPT‑4o‑mini
           </div>
         </aside>
 
         <main className="min-w-0 flex-1">
-          <header className="border-b border-slate-200 bg-white/80 backdrop-blur">
+          <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/85 shadow-sm shadow-slate-900/5 backdrop-blur-md">
             <div className="mx-auto flex max-w-6xl flex-col gap-4 px-5 py-5 sm:px-7">
               <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <h1 className="text-xl font-semibold tracking-tight text-slate-900">{meta.title}</h1>
-                  <p className="mt-1 text-base text-slate-500">{meta.subtitle}</p>
+                <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
+                  <BrandLogoMark size={38} className="shrink-0 shadow-md shadow-indigo-500/20 md:hidden" />
+                  <div className="min-w-0">
+                    <h1 className="text-xl font-semibold tracking-tight text-slate-900">{meta.title}</h1>
+                    <p className="mt-1 text-base leading-relaxed text-slate-500">{meta.subtitle}</p>
+                  </div>
                 </div>
                 <div className="hidden shrink-0 items-center gap-2 sm:flex">
                   <Badge tone="blue">HF Space</Badge>
                   <Badge tone="slate">Dual RAG</Badge>
                 </div>
               </div>
-              <div className="flex gap-1 overflow-x-auto pb-1 md:hidden">
+              <div className="flex gap-1.5 overflow-x-auto pb-0.5 md:hidden" role="tablist" aria-label="Sections">
                 {CONSOLE_NAV.map((item) => (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => setConsoleSection(item.id)}
-                    className={`shrink-0 rounded-full px-3.5 py-2 text-sm font-medium transition ${
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70 ${
                       consoleSection === item.id
-                        ? "bg-slate-900 text-white"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/25"
+                        : "bg-white/90 text-slate-600 shadow-sm ring-1 ring-slate-200/80 hover:bg-slate-50"
                     }`}
                   >
+                    <NavSectionIcon id={item.id} className="h-4 w-4 shrink-0 opacity-95" />
                     {item.label}
                   </button>
                 ))}
@@ -428,24 +509,24 @@ export default function App() {
 
           <div className="mx-auto max-w-6xl space-y-7 px-5 py-7 sm:px-7">
             {error && (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+              <div className="rounded-2xl border border-rose-200/80 bg-rose-50/90 px-4 py-3.5 text-sm text-rose-900 shadow-sm ring-1 ring-rose-100/80">
                 {error}
               </div>
             )}
 
             {consoleSection === "overview" && (
               <>
-                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <section className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm ring-1 ring-slate-900/[0.04]">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                     <div>
                       <h2 className="text-base font-semibold text-slate-900">Data ingest</h2>
-                      <p className="mt-1 text-sm text-slate-500">
+                      <p className="mt-1.5 text-sm leading-relaxed text-slate-500">
                         Required columns: order_id, customer_id, order_date, product_id, product_name, category,
                         price, quantity, payment_method, country, city
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
-                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100">
+                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/90 bg-slate-50/90 px-4 py-2.5 text-sm font-medium text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-white">
                         <input
                           type="file"
                           accept=".csv"
@@ -458,45 +539,54 @@ export default function App() {
                         type="button"
                         onClick={onUpload}
                         disabled={loading}
-                        className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60"
+                        className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-500/25 transition hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60"
                       >
                         {loading ? "Analyzing…" : "Run analysis"}
                       </button>
                     </div>
                   </div>
                   {file && (
-                    <div className="mt-3 text-xs text-slate-600">
-                      Selected: <span className="font-mono">{file.name}</span>
+                    <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs text-slate-600">
+                      Selected: <span className="font-mono text-slate-800">{file.name}</span>
                     </div>
                   )}
                 </section>
 
                 {stats && (
                   <section className="grid gap-4 sm:grid-cols-3">
-                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                      <div className="text-xs font-medium text-slate-500">Rows processed</div>
-                      <div className="mt-2 text-2xl font-semibold text-slate-900">{stats.total}</div>
+                    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm ring-1 ring-slate-900/[0.04]">
+                      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Rows processed</div>
+                      <div className="mt-2 bg-gradient-to-br from-slate-800 to-slate-600 bg-clip-text text-2xl font-semibold text-transparent">
+                        {stats.total}
+                      </div>
                     </div>
-                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                      <div className="text-xs font-medium text-slate-500">Anomalies</div>
+                    <div className="rounded-2xl border border-rose-100/80 bg-gradient-to-br from-rose-50/80 to-white p-5 shadow-sm ring-1 ring-rose-100/60">
+                      <div className="text-xs font-medium uppercase tracking-wide text-rose-600/90">Anomalies</div>
                       <div className="mt-2 text-2xl font-semibold text-rose-600">{stats.hits}</div>
                     </div>
-                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                      <div className="text-xs font-medium text-slate-500">Anomaly rate</div>
-                      <div className="mt-2 text-2xl font-semibold text-slate-900">{stats.rate}%</div>
+                    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm ring-1 ring-slate-900/[0.04]">
+                      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Anomaly rate</div>
+                      <div className="mt-2 bg-gradient-to-br from-indigo-700 to-blue-600 bg-clip-text text-2xl font-semibold text-transparent">
+                        {stats.rate}%
+                      </div>
                     </div>
                   </section>
                 )}
 
                 {datasetPreview && (
-                  <DatasetPreviewTable rows={datasetPreview.rows} totalRows={datasetPreview.totalRows} />
+                  <DatasetPreviewTable
+                    rows={datasetPreview.rows}
+                    totalRows={datasetPreview.totalRows}
+                    anomalyByRowIndex={anomalyByRowForPreview}
+                    onAnomalyFlagClick={navigateToAnomalyFromPreview}
+                  />
                 )}
 
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-4 text-sm text-slate-600">
-                  <span className="font-medium text-slate-800">Next:</span> open{" "}
+                <div className="rounded-2xl border border-slate-200/70 bg-white/70 px-5 py-4 text-sm leading-relaxed text-slate-600 shadow-sm ring-1 ring-slate-900/[0.03] backdrop-blur-sm">
+                  <span className="font-semibold text-slate-800">Next:</span> open{" "}
                   <button
                     type="button"
-                    className="font-semibold text-blue-700 underline decoration-blue-200 underline-offset-2 hover:text-blue-900"
+                    className="font-semibold text-indigo-700 underline decoration-indigo-200/80 underline-offset-2 transition hover:text-indigo-900"
                     onClick={() => setConsoleSection("anomalies")}
                   >
                     Anomalies
@@ -504,7 +594,7 @@ export default function App() {
                   to review findings,{" "}
                   <button
                     type="button"
-                    className="font-semibold text-blue-700 underline decoration-blue-200 underline-offset-2 hover:text-blue-900"
+                    className="font-semibold text-indigo-700 underline decoration-indigo-200/80 underline-offset-2 transition hover:text-indigo-900"
                     onClick={() => setConsoleSection("evidence")}
                   >
                     Evidence
@@ -512,7 +602,7 @@ export default function App() {
                   for RAG detail, or{" "}
                   <button
                     type="button"
-                    className="font-semibold text-blue-700 underline decoration-blue-200 underline-offset-2 hover:text-blue-900"
+                    className="font-semibold text-indigo-700 underline decoration-indigo-200/80 underline-offset-2 transition hover:text-indigo-900"
                     onClick={() => setConsoleSection("assistant")}
                   >
                     Assistant
