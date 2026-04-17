@@ -24,7 +24,7 @@ export function BrandLogoMark({
       <defs>
         <linearGradient id={gradId} x1="8" y1="4" x2="36" y2="36" gradientUnits="userSpaceOnUse">
           <stop stopColor="#2563eb" />
-          <stop offset="1" stopColor="#4f46e5" />
+          <stop offset="1" stopColor="#1d4ed8" />
         </linearGradient>
       </defs>
       <rect width="40" height="40" rx="11" fill={`url(#${gradId})`} />
@@ -51,7 +51,7 @@ export function BrandLogoFull({
 }) {
   return (
     <div className={`flex items-center gap-3 ${className ?? ""}`}>
-      <BrandLogoMark size={compact ? 36 : 42} className="shrink-0 shadow-md shadow-indigo-500/25" />
+      <BrandLogoMark size={compact ? 36 : 42} className="shrink-0 shadow-md shadow-blue-500/25" />
       <div className="min-w-0">
         <div className={`font-semibold tracking-tight text-slate-900 ${compact ? "text-[0.95rem] leading-tight" : "text-base leading-tight"}`}>
           Billing Console

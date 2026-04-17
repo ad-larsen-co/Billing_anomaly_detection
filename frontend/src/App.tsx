@@ -88,6 +88,266 @@ function IconFlagFilled(props: { className?: string }) {
   );
 }
 
+function IconPanelTable(props: { className?: string }) {
+  return (
+    <svg
+      className={props.className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3 6h18M3 12h18M3 18h18M9 3v18M15 3v18" />
+    </svg>
+  );
+}
+
+function IconPanelUpload(props: { className?: string }) {
+  return (
+    <svg
+      className={props.className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M12 3v12" />
+      <path d="m7 8 5-5 5 5" />
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    </svg>
+  );
+}
+
+function IconPanelBook(props: { className?: string }) {
+  return (
+    <svg
+      className={props.className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" />
+      <path d="M8 7h8M8 11h6" />
+    </svg>
+  );
+}
+
+type SolverRagBlock =
+  | { kind: "paragraph"; text: string }
+  | { kind: "ordered"; items: string[] }
+  | { kind: "bullet"; items: string[] };
+
+function segmentRemediation(text: string): SolverRagBlock[] {
+  const lines = text.split(/\r?\n/);
+  const blocks: SolverRagBlock[] = [];
+  let i = 0;
+
+  const numberedLine = (s: string) => {
+    const m = s.trim().match(/^(\d+)[\.\)]\s*(.+)$/);
+    return m ? m[2].trim() : null;
+  };
+  const bulletLine = (s: string) => {
+    const m = s.trim().match(/^[-*•]\s+(.+)$/);
+    return m ? m[1] : null;
+  };
+
+  while (i < lines.length) {
+    const raw = lines[i];
+    const line = raw.trim();
+    if (!line) {
+      i++;
+      continue;
+    }
+
+    const n = numberedLine(raw);
+    if (n !== null) {
+      const items: string[] = [];
+      while (i < lines.length) {
+        const item = numberedLine(lines[i]);
+        if (item === null) break;
+        items.push(item);
+        i++;
+      }
+      blocks.push({ kind: "ordered", items });
+      continue;
+    }
+
+    const b = bulletLine(raw);
+    if (b !== null) {
+      const items: string[] = [];
+      while (i < lines.length) {
+        const item = bulletLine(lines[i]);
+        if (item === null) break;
+        items.push(item);
+        i++;
+      }
+      blocks.push({ kind: "bullet", items });
+      continue;
+    }
+
+    const para: string[] = [line];
+    i++;
+    while (i < lines.length) {
+      const t = lines[i];
+      const tr = t.trim();
+      if (!tr) break;
+      if (numberedLine(t) !== null || bulletLine(t) !== null) break;
+      para.push(tr);
+      i++;
+    }
+    blocks.push({ kind: "paragraph", text: para.join(" ") });
+  }
+
+  return blocks;
+}
+
+function SolverRagInlineEmphasis({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return (
+    <>
+      {parts.map((p, idx) => {
+        const m = p.match(/^\*\*(.+)\*\*$/);
+        if (m) {
+          return (
+            <strong key={idx} className="font-semibold text-blue-950">
+              {m[1]}
+            </strong>
+          );
+        }
+        return <span key={idx}>{p}</span>;
+      })}
+    </>
+  );
+}
+
+function IconSolverRag(props: { className?: string }) {
+  return (
+    <svg
+      className={props.className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+    </svg>
+  );
+}
+
+/** Solver RAG remediation — same card pattern as Fact RAG in this file */
+function SolverRagOutput({ content }: { content: string | null }) {
+  const blocks = useMemo(() => {
+    if (!content?.trim()) return [];
+    return segmentRemediation(content.trim());
+  }, [content]);
+
+  const fallbackPlain = Boolean(content?.trim()) && blocks.length === 0;
+
+  if (!content?.trim()) {
+    return (
+      <div>
+        <div className="mb-2 flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-sm">
+            <IconSolverRag className="h-4 w-4" />
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-blue-950">Solver RAG</div>
+            <div className="text-xs text-blue-800/60">Remediation playbook</div>
+          </div>
+        </div>
+        <div className="rounded-lg border border-dashed border-blue-100/80 bg-blue-50/30 px-3 py-2 text-sm text-slate-500">
+          No remediation text for this anomaly.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center gap-2">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-sm">
+          <IconSolverRag className="h-4 w-4" />
+        </div>
+        <div>
+          <div className="text-sm font-semibold text-blue-950">Solver RAG</div>
+          <div className="text-xs text-blue-800/60">Remediation playbook</div>
+        </div>
+      </div>
+
+      <ul className="space-y-2">
+        {fallbackPlain && (
+          <li className="rounded-xl border border-blue-100/40 bg-gradient-to-br from-white to-blue-50/25 px-3 py-2.5 text-sm text-slate-700 shadow-sm ring-1 ring-blue-100/30">
+            <div className="whitespace-pre-wrap text-xs leading-relaxed text-slate-600">{content}</div>
+          </li>
+        )}
+        {!fallbackPlain &&
+          blocks.map((block, bi) => {
+            if (block.kind === "paragraph") {
+              return (
+                <li
+                  key={bi}
+                  className="rounded-xl border border-blue-100/40 bg-gradient-to-br from-white to-blue-50/25 px-3 py-2.5 text-sm text-slate-700 shadow-sm ring-1 ring-blue-100/30"
+                >
+                  <div className="whitespace-pre-wrap text-xs leading-relaxed text-slate-600">
+                    <SolverRagInlineEmphasis text={block.text} />
+                  </div>
+                </li>
+              );
+            }
+            if (block.kind === "ordered") {
+              return (
+                <li
+                  key={bi}
+                  className="rounded-xl border border-blue-100/40 bg-gradient-to-br from-white to-blue-50/25 px-3 py-2.5 text-sm shadow-sm ring-1 ring-blue-100/30"
+                >
+                  <ol className="list-none space-y-2 border-l-2 border-blue-200/70 pl-3">
+                    {block.items.map((item, ii) => (
+                      <li key={ii} className="relative pl-1 text-xs leading-relaxed text-slate-600">
+                        <span className="absolute -left-[1.35rem] top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-[9px] font-bold text-blue-700">
+                          {ii + 1}
+                        </span>
+                        <SolverRagInlineEmphasis text={item} />
+                      </li>
+                    ))}
+                  </ol>
+                </li>
+              );
+            }
+            return (
+              <li
+                key={bi}
+                className="rounded-xl border border-blue-100/40 bg-gradient-to-br from-white to-blue-50/25 px-3 py-2.5 text-sm shadow-sm ring-1 ring-blue-100/30"
+              >
+                <ul className="space-y-1.5">
+                  {block.items.map((item, ii) => (
+                    <li key={ii} className="flex gap-2 text-xs leading-relaxed text-slate-600">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400" aria-hidden />
+                      <SolverRagInlineEmphasis text={item} />
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            );
+          })}
+      </ul>
+    </div>
+  );
+}
+
 function DatasetPreviewTable({
   rows,
   totalRows,
@@ -104,22 +364,31 @@ function DatasetPreviewTable({
   const cols = Object.keys(rows[0] ?? {});
   const showFlagCol = Boolean(anomalyByRowIndex?.size && onAnomalyFlagClick);
   return (
-    <section className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm ring-1 ring-slate-900/[0.04]">
-      <h2 className="text-base font-semibold text-slate-900">Input dataset</h2>
-      <p className="mt-1.5 text-sm text-slate-500">
-        Preview of uploaded CSV — showing {rows.length} of {totalRows} row{totalRows === 1 ? "" : "s"} (capped for
-        performance).
-        {showFlagCol && (
-          <span className="text-slate-600">
-            {" "}
-            <span className="font-medium text-slate-700">Red flags</span> mark rows detected as anomalies; click a flag
-            to open that row in Anomalies.
-          </span>
-        )}
-      </p>
-      <div className="mt-4 max-h-[min(60vh,520px)] overflow-auto rounded-xl border border-slate-100">
+    <section className="app-panel app-panel-blue">
+      <div className="app-panel-bar" aria-hidden />
+      <div className="app-panel-body">
+        <div className="mb-4 flex items-start gap-3 border-b border-blue-100/60 pb-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-md shadow-blue-500/30">
+            <IconPanelTable className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold tracking-tight text-blue-950">Input dataset</h2>
+            <p className="mt-1 text-sm leading-relaxed text-slate-600">
+              Preview of uploaded CSV — showing {rows.length} of {totalRows} row{totalRows === 1 ? "" : "s"} (capped for
+              performance).
+              {showFlagCol && (
+                <span>
+                  {" "}
+                  <span className="font-medium text-blue-900/80">Red flags</span> mark rows detected as anomalies;
+                  click a flag to open that row in Anomalies.
+                </span>
+              )}
+            </p>
+          </div>
+        </div>
+        <div className="max-h-[min(60vh,520px)] overflow-auto rounded-xl border border-blue-100/40 bg-white/60 shadow-inner shadow-blue-950/[0.02]">
         <table className="w-full min-w-max border-collapse text-left text-sm">
-          <thead className="sticky top-0 z-10 bg-slate-100 shadow-sm">
+          <thead className="sticky top-0 z-10 bg-gradient-to-b from-blue-50/90 to-slate-50/95 shadow-sm">
             <tr>
               {showFlagCol && (
                 <th
@@ -172,6 +441,7 @@ function DatasetPreviewTable({
             })}
           </tbody>
         </table>
+        </div>
       </div>
     </section>
   );
@@ -319,10 +589,10 @@ export default function App() {
   const meta = SECTION_META[consoleSection];
 
   const renderAnomalyList = (onPick: (a: Anomaly) => void) => (
-    <div className="max-h-[min(70vh,520px)] space-y-2 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+    <div className="app-panel max-h-[min(70vh,520px)] space-y-2 overflow-y-auto p-2">
       {anomalies.length === 0 && (
         <div className="px-3 py-8 text-center text-sm text-slate-500">
-          No anomalies yet. Go to <span className="font-medium text-slate-700">Overview</span> and run analysis on
+          No anomalies yet. Go to <span className="font-medium text-blue-900/80">Overview</span> and run analysis on
           a CSV.
         </div>
       )}
@@ -331,8 +601,8 @@ export default function App() {
           key={a.id}
           type="button"
           onClick={() => onPick(a)}
-          className={`w-full rounded-xl px-3 py-3 text-left transition hover:bg-slate-50 ${
-            selected?.id === a.id ? "bg-blue-50 ring-1 ring-blue-100" : ""
+          className={`w-full rounded-xl px-3 py-3 text-left transition hover:bg-blue-50/50 ${
+            selected?.id === a.id ? "bg-blue-50/90 shadow-sm ring-1 ring-blue-200/70" : ""
           }`}
         >
           <div className="flex items-center justify-between gap-2">
@@ -349,7 +619,7 @@ export default function App() {
   const evidencePanel = (
     <>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-base font-semibold text-slate-900">Details</h2>
+        <h2 className="text-base font-semibold tracking-tight text-blue-950">Details</h2>
         {selected && (
           <div className="flex items-center gap-1">
             <button
@@ -391,52 +661,60 @@ export default function App() {
           </div>
         )}
       </div>
-      <div className="min-h-[280px] rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="app-panel app-panel-blue min-h-[280px]">
+        <div className="app-panel-bar" aria-hidden />
+        <div className="app-panel-body space-y-5">
         {!run && (
-          <div className="text-sm text-slate-500">
-            Run an analysis from <span className="font-medium text-slate-700">Overview</span> first.
+          <div className="text-sm text-slate-600">
+            Run an analysis from <span className="font-medium text-blue-900/90">Overview</span> first.
           </div>
         )}
         {run && !selected && (
-          <div className="text-sm text-slate-500">Select an anomaly from the list to view evidence and remediation.</div>
+          <div className="text-sm text-slate-600">Select an anomaly from the list to view evidence and remediation.</div>
         )}
         {selected && (
-          <div className="space-y-4">
-            <div>
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Confidence</div>
-              <div className="mt-1 text-2xl font-semibold text-slate-900">
+          <>
+            <div className="rounded-xl border border-blue-100/50 bg-white/70 px-4 py-3 shadow-inner shadow-blue-950/[0.02]">
+              <div className="app-section-label">Confidence</div>
+              <div className="mt-1 bg-gradient-to-br from-slate-800 to-blue-800 bg-clip-text text-2xl font-semibold text-transparent">
                 {(selected.confidence * 100).toFixed(1)}%
               </div>
             </div>
-            <div>
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Explanation</div>
-              <p className="mt-1 text-sm leading-relaxed text-slate-700">{selected.explanation ?? "—"}</p>
+            <div className="rounded-xl border border-blue-100/40 bg-white/60 px-4 py-3">
+              <div className="app-section-label">Explanation</div>
+              <p className="mt-2 text-sm leading-relaxed text-slate-700">{selected.explanation ?? "—"}</p>
             </div>
             <div>
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Fact RAG · contract evidence</div>
-              <ul className="mt-2 space-y-2">
+              <div className="mb-2 flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-sm">
+                  <IconPanelBook className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-blue-950">Fact RAG</div>
+                  <div className="text-xs text-blue-800/60">Contract evidence</div>
+                </div>
+              </div>
+              <ul className="space-y-2">
                 {(selected.evidence_refs ?? []).length === 0 && (
-                  <li className="text-sm text-slate-500">No snippets retrieved.</li>
+                  <li className="rounded-lg border border-dashed border-blue-100/80 bg-blue-50/30 px-3 py-2 text-sm text-slate-500">
+                    No snippets retrieved.
+                  </li>
                 )}
                 {(selected.evidence_refs ?? []).map((ev, idx) => (
                   <li
                     key={idx}
-                    className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+                    className="rounded-xl border border-blue-100/40 bg-gradient-to-br from-white to-blue-50/25 px-3 py-2.5 text-sm text-slate-700 shadow-sm ring-1 ring-blue-100/30"
                   >
-                    <div className="text-xs font-semibold text-slate-900">{String(ev.title ?? "Clause")}</div>
-                    <div className="mt-1 whitespace-pre-wrap text-xs text-slate-600">{String(ev.excerpt ?? "")}</div>
+                    <div className="text-xs font-semibold text-blue-950">{String(ev.title ?? "Clause")}</div>
+                    <div className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-slate-600">{String(ev.excerpt ?? "")}</div>
                   </li>
                 ))}
               </ul>
             </div>
-            <div>
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Solver RAG · playbook</div>
-              <div className="mt-2 whitespace-pre-wrap rounded-xl border border-blue-100 bg-blue-50/60 px-3 py-3 text-sm text-slate-800">
-                {selected.remediation ?? "—"}
-              </div>
-            </div>
-          </div>
+            <SolverRagOutput content={selected.remediation} />
+          </>
         )}
+        </div>
       </div>
     </>
   );
@@ -444,7 +722,7 @@ export default function App() {
   return (
     <div className="app-backdrop min-h-screen text-slate-900">
       <div className="flex min-h-screen">
-        <aside className="hidden w-[17rem] flex-shrink-0 flex-col border-r border-slate-200/80 bg-white/95 shadow-[4px_0_32px_-12px_rgba(15,23,42,0.12)] backdrop-blur-md md:flex">
+        <aside className="app-sidebar-shell hidden w-[17rem] flex-shrink-0 flex-col md:flex">
           <div className="border-b border-slate-100/90 px-5 py-6">
             <BrandLogoFull />
           </div>
@@ -455,9 +733,9 @@ export default function App() {
                 type="button"
                 title={item.hint}
                 onClick={() => setConsoleSection(item.id)}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70 focus-visible:ring-offset-2 ${
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-2 ${
                   consoleSection === item.id
-                    ? "bg-indigo-50 font-medium text-indigo-950 shadow-sm ring-1 ring-indigo-100/90"
+                    ? "bg-blue-50 font-medium text-blue-950 shadow-sm ring-1 ring-blue-100/90"
                     : "text-slate-600 hover:bg-slate-50/90 hover:text-slate-900"
                 }`}
               >
@@ -472,11 +750,11 @@ export default function App() {
         </aside>
 
         <main className="min-w-0 flex-1">
-          <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/85 shadow-sm shadow-slate-900/5 backdrop-blur-md">
+          <header className="app-header-shell">
             <div className="mx-auto flex max-w-6xl flex-col gap-4 px-5 py-5 sm:px-7">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
-                  <BrandLogoMark size={38} className="shrink-0 shadow-md shadow-indigo-500/20 md:hidden" />
+                  <BrandLogoMark size={38} className="shrink-0 shadow-md shadow-blue-500/20 md:hidden" />
                   <div className="min-w-0">
                     <h1 className="text-xl font-semibold tracking-tight text-slate-900">{meta.title}</h1>
                     <p className="mt-1 text-base leading-relaxed text-slate-500">{meta.subtitle}</p>
@@ -493,9 +771,9 @@ export default function App() {
                     key={item.id}
                     type="button"
                     onClick={() => setConsoleSection(item.id)}
-                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70 ${
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 ${
                       consoleSection === item.id
-                        ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/25"
+                        ? "bg-blue-600 text-white shadow-md shadow-blue-500/25"
                         : "bg-white/90 text-slate-600 shadow-sm ring-1 ring-slate-200/80 hover:bg-slate-50"
                     }`}
                   >
@@ -509,64 +787,72 @@ export default function App() {
 
           <div className="mx-auto max-w-6xl space-y-7 px-5 py-7 sm:px-7">
             {error && (
-              <div className="rounded-2xl border border-rose-200/80 bg-rose-50/90 px-4 py-3.5 text-sm text-rose-900 shadow-sm ring-1 ring-rose-100/80">
+              <div className="app-panel border-rose-200/70 bg-gradient-to-br from-rose-50/95 to-white px-4 py-3.5 text-sm text-rose-900 shadow-sm ring-rose-100/60">
                 {error}
               </div>
             )}
 
             {consoleSection === "overview" && (
               <>
-                <section className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm ring-1 ring-slate-900/[0.04]">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                      <h2 className="text-base font-semibold text-slate-900">Data ingest</h2>
-                      <p className="mt-1.5 text-sm leading-relaxed text-slate-500">
-                        Required columns: order_id, customer_id, order_date, product_id, product_name, category,
-                        price, quantity, payment_method, country, city
-                      </p>
+                <section className="app-panel app-panel-blue">
+                  <div className="app-panel-bar" aria-hidden />
+                  <div className="app-panel-body">
+                    <div className="mb-3 flex flex-col gap-4 border-b border-blue-100/60 pb-4 sm:flex-row sm:items-end sm:justify-between">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-md shadow-blue-500/30">
+                          <IconPanelUpload className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h2 className="text-base font-semibold tracking-tight text-blue-950">Data ingest</h2>
+                          <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                            Required columns: order_id, customer_id, order_date, product_id, product_name, category,
+                            price, quantity, payment_method, country, city
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3 sm:pl-0">
+                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-blue-100/80 bg-white/80 px-4 py-2.5 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-blue-100/50 transition hover:border-blue-200 hover:bg-white">
+                          <input
+                            type="file"
+                            accept=".csv"
+                            className="hidden"
+                            onChange={onCsvFileChange}
+                          />
+                          Choose CSV
+                        </label>
+                        <button
+                          type="button"
+                          onClick={onUpload}
+                          disabled={loading}
+                          className="rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-500/25 transition hover:from-blue-700 hover:to-blue-800 disabled:opacity-60"
+                        >
+                          {loading ? "Analyzing…" : "Run analysis"}
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/90 bg-slate-50/90 px-4 py-2.5 text-sm font-medium text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-white">
-                        <input
-                          type="file"
-                          accept=".csv"
-                          className="hidden"
-                          onChange={onCsvFileChange}
-                        />
-                        Choose CSV
-                      </label>
-                      <button
-                        type="button"
-                        onClick={onUpload}
-                        disabled={loading}
-                        className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-500/25 transition hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60"
-                      >
-                        {loading ? "Analyzing…" : "Run analysis"}
-                      </button>
-                    </div>
+                    {file && (
+                      <div className="rounded-xl border border-blue-100/50 bg-blue-50/40 px-3 py-2 text-xs text-slate-700">
+                        Selected: <span className="font-mono">{file.name}</span>
+                      </div>
+                    )}
                   </div>
-                  {file && (
-                    <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs text-slate-600">
-                      Selected: <span className="font-mono text-slate-800">{file.name}</span>
-                    </div>
-                  )}
                 </section>
 
                 {stats && (
                   <section className="grid gap-4 sm:grid-cols-3">
-                    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm ring-1 ring-slate-900/[0.04]">
-                      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Rows processed</div>
+                    <div className="app-panel p-5">
+                      <div className="app-section-label">Rows processed</div>
                       <div className="mt-2 bg-gradient-to-br from-slate-800 to-slate-600 bg-clip-text text-2xl font-semibold text-transparent">
                         {stats.total}
                       </div>
                     </div>
-                    <div className="rounded-2xl border border-rose-100/80 bg-gradient-to-br from-rose-50/80 to-white p-5 shadow-sm ring-1 ring-rose-100/60">
-                      <div className="text-xs font-medium uppercase tracking-wide text-rose-600/90">Anomalies</div>
+                    <div className="app-panel p-5 ring-rose-100/50">
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-rose-600/90">Anomalies</div>
                       <div className="mt-2 text-2xl font-semibold text-rose-600">{stats.hits}</div>
                     </div>
-                    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm ring-1 ring-slate-900/[0.04]">
-                      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Anomaly rate</div>
-                      <div className="mt-2 bg-gradient-to-br from-indigo-700 to-blue-600 bg-clip-text text-2xl font-semibold text-transparent">
+                    <div className="app-panel p-5">
+                      <div className="app-section-label">Anomaly rate</div>
+                      <div className="mt-2 bg-gradient-to-br from-blue-700 to-blue-600 bg-clip-text text-2xl font-semibold text-transparent">
                         {stats.rate}%
                       </div>
                     </div>
@@ -582,32 +868,35 @@ export default function App() {
                   />
                 )}
 
-                <div className="rounded-2xl border border-slate-200/70 bg-white/70 px-5 py-4 text-sm leading-relaxed text-slate-600 shadow-sm ring-1 ring-slate-900/[0.03] backdrop-blur-sm">
-                  <span className="font-semibold text-slate-800">Next:</span> open{" "}
-                  <button
-                    type="button"
-                    className="font-semibold text-indigo-700 underline decoration-indigo-200/80 underline-offset-2 transition hover:text-indigo-900"
-                    onClick={() => setConsoleSection("anomalies")}
-                  >
-                    Anomalies
-                  </button>{" "}
-                  to review findings,{" "}
-                  <button
-                    type="button"
-                    className="font-semibold text-indigo-700 underline decoration-indigo-200/80 underline-offset-2 transition hover:text-indigo-900"
-                    onClick={() => setConsoleSection("evidence")}
-                  >
-                    Evidence
-                  </button>{" "}
-                  for RAG detail, or{" "}
-                  <button
-                    type="button"
-                    className="font-semibold text-indigo-700 underline decoration-indigo-200/80 underline-offset-2 transition hover:text-indigo-900"
-                    onClick={() => setConsoleSection("assistant")}
-                  >
-                    Assistant
-                  </button>{" "}
-                  to ask questions.
+                <div className="app-panel app-panel-blue">
+                  <div className="app-panel-bar" aria-hidden />
+                  <div className="app-panel-body py-4 text-sm leading-relaxed text-slate-600">
+                    <span className="font-semibold text-blue-950">Next:</span> open{" "}
+                    <button
+                      type="button"
+                      className="font-semibold text-blue-700 underline decoration-blue-200/80 underline-offset-2 transition hover:text-blue-900"
+                      onClick={() => setConsoleSection("anomalies")}
+                    >
+                      Anomalies
+                    </button>{" "}
+                    to review findings,{" "}
+                    <button
+                      type="button"
+                      className="font-semibold text-blue-700 underline decoration-blue-200/80 underline-offset-2 transition hover:text-blue-900"
+                      onClick={() => setConsoleSection("evidence")}
+                    >
+                      Evidence
+                    </button>{" "}
+                    for RAG detail, or{" "}
+                    <button
+                      type="button"
+                      className="font-semibold text-blue-700 underline decoration-blue-200/80 underline-offset-2 transition hover:text-blue-900"
+                      onClick={() => setConsoleSection("assistant")}
+                    >
+                      Assistant
+                    </button>{" "}
+                    to ask questions.
+                  </div>
                 </div>
               </>
             )}
@@ -615,22 +904,22 @@ export default function App() {
             {consoleSection === "anomalies" && (
               <section>
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-base font-semibold text-slate-900">All anomalies</h2>
+                  <h2 className="text-base font-semibold tracking-tight text-blue-950">All anomalies</h2>
                   <span className="text-xs text-slate-500">{anomalies.length} items</span>
                 </div>
                 {stats && (
                   <div className="mb-4 grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                      <div className="text-xs font-medium uppercase text-slate-500">Rows</div>
+                    <div className="app-panel px-3 py-2.5">
+                      <div className="app-section-label">Rows</div>
                       <div className="text-lg font-semibold text-slate-900">{stats.total}</div>
                     </div>
-                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                      <div className="text-xs font-medium uppercase text-slate-500">Anomalies</div>
+                    <div className="app-panel px-3 py-2.5 ring-rose-100/40">
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-rose-600/90">Anomalies</div>
                       <div className="text-lg font-semibold text-rose-600">{stats.hits}</div>
                     </div>
-                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                      <div className="text-xs font-medium uppercase text-slate-500">Rate</div>
-                      <div className="text-lg font-semibold text-slate-900">{stats.rate}%</div>
+                    <div className="app-panel px-3 py-2.5">
+                      <div className="app-section-label">Rate</div>
+                      <div className="text-lg font-semibold text-blue-800">{stats.rate}%</div>
                     </div>
                   </div>
                 )}
@@ -645,7 +934,7 @@ export default function App() {
               <div className="grid gap-6 lg:grid-cols-5">
                 <section className="lg:col-span-2">
                   <div className="mb-3 flex items-center justify-between">
-                    <h2 className="text-base font-semibold text-slate-900">Pick an anomalies</h2>
+                    <h2 className="text-base font-semibold tracking-tight text-blue-950">Pick an anomaly</h2>
                     <span className="text-xs text-slate-500">{anomalies.length} items</span>
                   </div>
                   {renderAnomalyList((a) => setSelected(a))}
@@ -667,10 +956,10 @@ export default function App() {
         <div
           role="status"
           aria-live="polite"
-          className={`fixed bottom-4 right-4 z-[100] flex max-w-sm items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-lg ${
+          className={`fixed bottom-4 right-4 z-[100] flex max-w-sm items-start gap-3 rounded-2xl px-4 py-3 text-sm shadow-lg ring-1 ${
             feedbackToast.tone === "success"
-              ? "border-emerald-200 bg-white text-emerald-950"
-              : "border-rose-200 bg-white text-rose-950"
+              ? "border border-emerald-200/80 bg-gradient-to-br from-white to-emerald-50/40 text-emerald-950 ring-emerald-100/60"
+              : "border border-rose-200/80 bg-gradient-to-br from-white to-rose-50/40 text-rose-950 ring-rose-100/60"
           }`}
         >
           <span
