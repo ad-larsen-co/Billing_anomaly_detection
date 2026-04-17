@@ -185,17 +185,18 @@ export default function ChatAssistant() {
   const msgs = active?.messages ?? [];
 
   return (
-    <div className="flex w-full flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06),0_8px_24px_-4px_rgba(15,23,42,0.08)] ring-1 ring-slate-900/[0.04] min-h-[min(72vh,calc(100vh-11rem))] lg:flex-row lg:min-h-[min(640px,calc(100vh-12rem))]">
-      <aside className="flex max-h-44 flex-shrink-0 flex-col border-b border-slate-200/90 bg-gradient-to-b from-slate-50 to-slate-50/70 p-4 lg:max-h-none lg:w-[17.5rem] lg:min-w-[15rem] lg:border-b-0 lg:border-r lg:p-5">
-        <div className="mb-2 hidden text-xs font-semibold uppercase tracking-wider text-slate-400 lg:block">
+    <div className="app-panel app-panel-blue flex min-h-[min(72vh,calc(100vh-11rem))] w-full flex-1 flex-col overflow-hidden rounded-3xl lg:min-h-[min(640px,calc(100vh-12rem))] lg:flex-row">
+      <div className="app-panel-bar" aria-hidden />
+      <aside className="flex max-h-44 flex-shrink-0 flex-col border-b border-blue-100/50 bg-gradient-to-b from-blue-50/40 via-slate-50/80 to-slate-50/50 p-4 lg:max-h-none lg:w-[17.5rem] lg:min-w-[15rem] lg:border-b-0 lg:border-r lg:border-blue-100/40 lg:p-5">
+        <div className="mb-2 hidden text-xs font-semibold uppercase tracking-wider text-blue-800/45 lg:block">
           Conversations
         </div>
         <button
           type="button"
           onClick={onNewChat}
-          className="flex items-center justify-center gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-base font-semibold text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+          className="flex items-center justify-center gap-2.5 rounded-xl border border-blue-100/80 bg-white/90 px-4 py-3 text-left text-base font-semibold text-blue-950 shadow-sm ring-1 ring-blue-100/40 transition hover:border-blue-200 hover:bg-white"
         >
-          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-900 text-white">
+          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-sm">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-3.5 w-3.5" aria-hidden>
               <path d="M12 5v14M5 12h14" />
             </svg>
@@ -208,7 +209,7 @@ export default function ChatAssistant() {
               key={s.id}
               className={`group flex min-w-0 items-stretch gap-0.5 rounded-xl transition ${
                 s.id === activeId
-                  ? "bg-white shadow-md ring-1 ring-slate-200/90"
+                  ? "bg-white shadow-md ring-1 ring-blue-200/70"
                   : "hover:bg-white/90"
               }`}
             >
@@ -216,11 +217,11 @@ export default function ChatAssistant() {
                 type="button"
                 onClick={() => onSelectSession(s.id)}
                 className={`min-w-0 flex-1 rounded-xl px-3 py-3 text-left text-base ${
-                  s.id === activeId ? "font-medium text-slate-900" : "text-slate-600"
+                  s.id === activeId ? "font-medium text-blue-950" : "text-blue-800/75"
                 }`}
               >
                 <div className="line-clamp-2 leading-snug">{s.title}</div>
-                <div className="mt-1 text-xs tabular-nums text-slate-400">
+                <div className="mt-1 text-xs tabular-nums text-blue-400/90">
                   {formatChatTime(s.updatedAt)}
                 </div>
               </button>
@@ -229,7 +230,7 @@ export default function ChatAssistant() {
                 title="Delete session"
                 aria-label={`Delete session: ${s.title}`}
                 onClick={(e) => onDeleteSession(e, s.id)}
-                className="flex shrink-0 items-center justify-center rounded-xl px-2.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                className="flex shrink-0 items-center justify-center rounded-xl px-2.5 text-blue-400/80 transition hover:bg-rose-50 hover:text-rose-600"
               >
                 <svg
                   viewBox="0 0 24 24"
@@ -247,28 +248,28 @@ export default function ChatAssistant() {
         </div>
       </aside>
 
-      <div className="flex min-h-0 flex-1 flex-col bg-white">
-        <div className="border-b border-slate-100 bg-white px-6 py-5">
+      <div className="flex min-h-0 flex-1 flex-col bg-gradient-to-br from-white via-white to-blue-50/20">
+        <div className="border-b border-blue-100/50 bg-white/80 px-6 py-5 backdrop-blur-[2px]">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold tracking-tight text-slate-900">Billing assistant</h2>
-              <p className="mt-1.5 max-w-2xl text-base leading-relaxed text-slate-500">
+              <h2 className="text-lg font-semibold tracking-tight text-blue-950">Billing assistant</h2>
+              <p className="mt-1.5 max-w-2xl text-base leading-relaxed text-blue-900/65">
                 Natural language over your analysis runs, anomaly records, and contract clauses. Responses stream in
                 real time.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600">
+              <span className="rounded-full border border-blue-100/80 bg-blue-50/50 px-3 py-1.5 text-xs font-medium text-blue-900/75">
                 GPT‑4o‑mini
               </span>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600">
+              <span className="rounded-full border border-blue-100/80 bg-blue-50/50 px-3 py-1.5 text-xs font-medium text-blue-900/75">
                 Local sessions
               </span>
             </div>
           </div>
           {lastMeta && (
-            <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4 text-xs">
-              <span className="inline-flex items-center rounded-lg bg-slate-100 px-3 py-1.5 font-mono text-slate-700">
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-blue-100/60 pt-4 text-xs">
+              <span className="inline-flex items-center rounded-lg bg-blue-50/80 px-3 py-1.5 font-mono text-blue-900/80">
                 intent · {lastMeta.intent}
               </span>
               {lastMeta.sql_used && (
@@ -280,16 +281,16 @@ export default function ChatAssistant() {
           )}
         </div>
 
-        <div className="flex-1 space-y-6 overflow-y-auto bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_12%)] px-5 py-6 sm:px-7">
+        <div className="flex-1 space-y-6 overflow-y-auto bg-gradient-to-b from-blue-50/25 via-white to-white px-5 py-6 sm:px-7">
           {msgs.length === 0 && !busy && (
-            <div className="mx-auto max-w-xl rounded-2xl border border-slate-200/80 bg-white px-7 py-11 text-center shadow-sm">
-              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-600">
+            <div className="mx-auto max-w-xl rounded-2xl border border-blue-100/80 bg-white/90 px-7 py-11 text-center shadow-sm ring-1 ring-blue-100/40">
+              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100/80 text-blue-600">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-7 w-7" aria-hidden>
                   <path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               </div>
-              <p className="text-lg font-semibold text-slate-900">Start a conversation</p>
-              <p className="mt-3 text-base leading-relaxed text-slate-500">
+              <p className="text-lg font-semibold text-blue-950">Start a conversation</p>
+              <p className="mt-3 text-base leading-relaxed text-blue-800/60">
                 Ask about anomalies, database counts, high-severity alerts, or contract language (e.g. refunds).
               </p>
             </div>
@@ -304,8 +305,8 @@ export default function ChatAssistant() {
                 <div
                   className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                     m.role === "user"
-                      ? "bg-slate-800 text-white"
-                      : "border border-slate-200 bg-white text-slate-600 shadow-sm"
+                      ? "bg-gradient-to-br from-blue-700 to-blue-800 text-white shadow-sm"
+                      : "border border-blue-200/80 bg-white text-blue-700 shadow-sm"
                   }`}
                   aria-hidden
                 >
@@ -315,8 +316,8 @@ export default function ChatAssistant() {
                   <div
                     className={`inline-block rounded-2xl px-5 py-3.5 text-base leading-relaxed shadow-sm ${
                       m.role === "user"
-                        ? "bg-slate-900 text-left text-white"
-                        : "border border-slate-200/90 bg-white text-left text-slate-800"
+                        ? "bg-gradient-to-br from-blue-700 to-blue-900 text-left text-white shadow-md shadow-blue-900/15"
+                        : "border border-blue-100/90 bg-white text-left text-blue-950 ring-1 ring-blue-100/50"
                     }`}
                   >
                     {m.role === "assistant" ? (
@@ -340,11 +341,11 @@ export default function ChatAssistant() {
           </div>
         )}
 
-        <div className="border-t border-slate-200/90 bg-slate-50/80 px-5 py-5 sm:px-7">
+        <div className="border-t border-blue-100/60 bg-blue-50/30 px-5 py-5 sm:px-7">
           <div className="mx-auto flex max-w-3xl gap-3.5">
             <textarea
               rows={2}
-              className="max-h-40 min-h-[56px] flex-1 resize-y rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-base text-slate-900 shadow-inner shadow-slate-900/5 outline-none ring-slate-200/80 placeholder:text-slate-400 placeholder:text-base focus:border-slate-300 focus:ring-2 focus:ring-slate-900/10"
+              className="max-h-40 min-h-[56px] flex-1 resize-y rounded-2xl border border-blue-200/80 bg-white px-5 py-3.5 text-base text-blue-950 shadow-inner shadow-blue-950/5 outline-none ring-blue-100/60 placeholder:text-blue-400/80 placeholder:text-base focus:border-blue-300 focus:ring-2 focus:ring-blue-500/25"
               placeholder="Ask a question about your billing data…"
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -360,7 +361,7 @@ export default function ChatAssistant() {
               type="button"
               onClick={() => void onSend()}
               disabled={busy || !input.trim()}
-              className="inline-flex shrink-0 items-center justify-center gap-2 self-end rounded-2xl bg-slate-900 px-6 py-3.5 text-base font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-45"
+              className="inline-flex shrink-0 items-center justify-center gap-2 self-end rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-3.5 text-base font-semibold text-white shadow-md shadow-blue-500/25 transition hover:from-blue-700 hover:to-blue-800 disabled:opacity-45"
             >
               {busy ? (
                 <span className="text-xl leading-none">…</span>
@@ -374,7 +375,7 @@ export default function ChatAssistant() {
               )}
             </button>
           </div>
-          <p className="mx-auto mt-4 max-w-3xl text-center text-xs text-slate-400">
+          <p className="mx-auto mt-4 max-w-3xl text-center text-xs text-blue-400/90">
             Enter to send · Shift+Enter for newline · Sessions stored in this browser only
           </p>
         </div>

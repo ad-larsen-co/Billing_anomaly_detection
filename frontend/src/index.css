@@ -17,7 +17,7 @@ body {
 
 ::selection {
   background-color: rgb(219 234 254);
-  color: rgb(30 27 75);
+  color: rgb(23 37 84);
 }
 
 /* Subtle page backdrop (works with Tailwind layers) */
@@ -26,6 +26,37 @@ body {
     background-color: rgb(248 250 252);
     background-image:
       radial-gradient(ellipse 120% 90% at 50% -25%, rgb(59 130 246 / 0.09), transparent 55%),
-      radial-gradient(ellipse 80% 50% at 100% 0%, rgb(99 102 241 / 0.06), transparent 45%);
+      radial-gradient(ellipse 80% 50% at 100% 0%, rgb(37 99 235 / 0.06), transparent 45%);
+  }
+}
+
+/* Surfaces: soft gradient, ring, optional blue accent bar */
+@layer components {
+  .app-panel {
+    @apply relative overflow-hidden rounded-2xl border border-slate-200/65 bg-gradient-to-br from-white via-slate-50/50 to-blue-50/20 shadow-sm ring-1 ring-slate-900/[0.04];
+  }
+
+  .app-panel-blue {
+    @apply border-blue-200/45 ring-blue-100/35;
+  }
+
+  .app-panel-bar {
+    @apply pointer-events-none absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-blue-500 via-blue-500 to-blue-600;
+  }
+
+  .app-panel-body {
+    @apply relative pl-5 pr-4 pb-5 pt-4 sm:pl-6 sm:pr-5;
+  }
+
+  .app-section-label {
+    @apply text-[11px] font-semibold uppercase tracking-wider text-blue-900/50;
+  }
+
+  .app-header-shell {
+    @apply sticky top-0 z-20 border-b border-blue-100/40 bg-white/90 shadow-sm shadow-blue-950/[0.04] backdrop-blur-md;
+  }
+
+  .app-sidebar-shell {
+    @apply border-r border-blue-100/30 bg-gradient-to-b from-white via-white to-blue-50/30 shadow-[4px_0_32px_-12px_rgba(37,99,235,0.08)] backdrop-blur-md;
   }
 }
