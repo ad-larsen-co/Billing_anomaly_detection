@@ -69,26 +69,66 @@ function formatDatasetCell(v: unknown): string {
   return String(v);
 }
 
+/** Map dataframe row index (matches preview row order) → one anomaly record for navigation. */
+function anomalyMapByRowIndex(anomalies: Anomaly[]): Map<number, Anomaly> {
+  const m = new Map<number, Anomaly>();
+  for (const a of anomalies) {
+    if (!m.has(a.row_index)) m.set(a.row_index, a);
+  }
+  return m;
+}
+
+function IconFlagFilled(props: { className?: string }) {
+  return (
+    <svg className={props.className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <rect x="4" y="3" width="2.25" height="18" rx="0.4" />
+      <path d="M8.25 5h11.5A1.25 1.25 0 0 1 21 6.25v5.5A1.25 1.25 0 0 1 19.75 13H8.25V5z" />
+    </svg>
+  );
+}
+
 function DatasetPreviewTable({
   rows,
   totalRows,
+  anomalyByRowIndex,
+  onAnomalyFlagClick,
 }: {
   rows: Record<string, unknown>[];
   totalRows: number;
+  /** When set, preview row index i matches server `row_index` for the same CSV row after analysis. */
+  anomalyByRowIndex?: Map<number, Anomaly> | null;
+  onAnomalyFlagClick?: (a: Anomaly) => void;
 }) {
   if (rows.length === 0) return null;
   const cols = Object.keys(rows[0] ?? {});
+  const showFlagCol = Boolean(anomalyByRowIndex?.size && onAnomalyFlagClick);
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <h2 className="text-base font-semibold text-slate-900">Input dataset</h2>
       <p className="mt-1.5 text-sm text-slate-500">
         Preview of uploaded CSV — showing {rows.length} of {totalRows} row{totalRows === 1 ? "" : "s"} (capped for
         performance).
+        {showFlagCol && (
+          <span className="text-slate-600">
+            {" "}
+            <span className="font-medium text-slate-700">Red flags</span> mark rows detected as anomalies; click a flag
+            to open that row in Anomalies.
+          </span>
+        )}
       </p>
       <div className="mt-4 max-h-[min(60vh,520px)] overflow-auto rounded-xl border border-slate-100">
         <table className="w-full min-w-max border-collapse text-left text-sm">
           <thead className="sticky top-0 z-10 bg-slate-100 shadow-sm">
             <tr>
+              {showFlagCol && (
+                <th
+                  scope="col"
+                  className="w-12 border-b border-slate-200 px-1 py-2.5 text-center font-semibold text-slate-500"
+                  title="Anomaly flag"
+                >
+                  <span className="sr-only">Anomaly</span>
+                </th>
+              )}
               {cols.map((c) => (
                 <th
                   key={c}
@@ -100,15 +140,35 @@ function DatasetPreviewTable({
             </tr>
           </thead>
           <tbody className="text-slate-700">
-            {rows.map((r, i) => (
-              <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/80">
-                {cols.map((c) => (
-                  <td key={c} className="max-w-[16rem] truncate px-3 py-2 align-top font-mono text-sm">
-                    {formatDatasetCell(r[c])}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {rows.map((r, i) => {
+              const flagged = showFlagCol ? anomalyByRowIndex?.get(i) : undefined;
+              return (
+                <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/80">
+                  {showFlagCol && (
+                    <td className="w-12 px-1 py-2 align-middle text-center">
+                      {flagged ? (
+                        <button
+                          type="button"
+                          onClick={() => onAnomalyFlagClick?.(flagged)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-400/60"
+                          title={`${flagged.anomaly_type} — open in Anomalies`}
+                          aria-label={`Open anomaly for row ${flagged.row_index} in Anomalies`}
+                        >
+                          <IconFlagFilled className="h-5 w-5 drop-shadow-sm" />
+                        </button>
+                      ) : (
+                        <span className="inline-block h-8 w-8" aria-hidden />
+                      )}
+                    </td>
+                  )}
+                  {cols.map((c) => (
+                    <td key={c} className="max-w-[16rem] truncate px-3 py-2 align-top font-mono text-sm">
+                      {formatDatasetCell(r[c])}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -238,6 +298,22 @@ export default function App() {
     }
     return null;
   }, [run, csvPreview]);
+
+  /** Preview rows are `df.head(200)` from the run — row index `i` matches `Anomaly.row_index`. */
+  const anomalyByRowForPreview = useMemo(() => {
+    if (!run?.anomalies?.length || !datasetPreview) return null;
+    const m = anomalyMapByRowIndex(run.anomalies);
+    const n = datasetPreview.rows.length;
+    for (const idx of m.keys()) {
+      if (idx >= 0 && idx < n) return m;
+    }
+    return null;
+  }, [run?.anomalies, datasetPreview]);
+
+  const navigateToAnomalyFromPreview = useCallback((a: Anomaly) => {
+    setSelected(a);
+    setConsoleSection("anomalies");
+  }, []);
 
   const meta = SECTION_META[consoleSection];
 
@@ -489,7 +565,12 @@ export default function App() {
                 )}
 
                 {datasetPreview && (
-                  <DatasetPreviewTable rows={datasetPreview.rows} totalRows={datasetPreview.totalRows} />
+                  <DatasetPreviewTable
+                    rows={datasetPreview.rows}
+                    totalRows={datasetPreview.totalRows}
+                    anomalyByRowIndex={anomalyByRowForPreview}
+                    onAnomalyFlagClick={navigateToAnomalyFromPreview}
+                  />
                 )}
 
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-4 text-sm text-slate-600">
