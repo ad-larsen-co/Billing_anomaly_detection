@@ -146,7 +146,27 @@ function IconPanelBook(props: { className?: string }) {
 type SolverRagBlock =
   | { kind: "paragraph"; text: string }
   | { kind: "ordered"; items: string[] }
-  | { kind: "bullet"; items: string[] };
+  | { kind: "bullet"; items: string[] }
+  /** Single numbered title + following bullet lines, one card in the UI */
+  | { kind: "step"; title: string; bullets: string[] };
+
+/** Merge `1. Title` + bullet block into one step so the title and body share one bordered card */
+function mergeRemediationSteps(blocks: SolverRagBlock[]): SolverRagBlock[] {
+  const out: SolverRagBlock[] = [];
+  let i = 0;
+  while (i < blocks.length) {
+    const b = blocks[i];
+    const next = blocks[i + 1];
+    if (b.kind === "ordered" && b.items.length === 1 && next?.kind === "bullet") {
+      out.push({ kind: "step", title: b.items[0]!, bullets: next.items });
+      i += 2;
+      continue;
+    }
+    out.push(b);
+    i++;
+  }
+  return out;
+}
 
 function segmentRemediation(text: string): SolverRagBlock[] {
   const lines = text.split(/\r?\n/);
@@ -209,7 +229,7 @@ function segmentRemediation(text: string): SolverRagBlock[] {
     blocks.push({ kind: "paragraph", text: para.join(" ") });
   }
 
-  return blocks;
+  return mergeRemediationSteps(blocks);
 }
 
 function SolverRagInlineEmphasis({ text }: { text: string }) {
@@ -296,6 +316,35 @@ function SolverRagOutput({ content }: { content: string | null }) {
         )}
         {!fallbackPlain &&
           blocks.map((block, bi) => {
+            if (block.kind === "step") {
+              const stepOrdinal =
+                blocks.slice(0, bi).filter((x) => x.kind === "step").length + 1;
+              return (
+                <li
+                  key={bi}
+                  className="overflow-hidden rounded-xl border border-blue-100/40 bg-gradient-to-br from-white to-blue-50/25 text-sm shadow-sm ring-1 ring-blue-100/30"
+                >
+                  <div className="flex items-start gap-2.5 border-b border-blue-100/40 bg-blue-50/50 px-3 py-2.5">
+                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[9px] font-bold text-blue-700">
+                      {stepOrdinal}
+                    </span>
+                    <div className="min-w-0 flex-1 font-semibold leading-snug text-slate-800">
+                      <SolverRagInlineEmphasis text={block.title} />
+                    </div>
+                  </div>
+                  <div className="px-3 py-2.5">
+                    <ul className="space-y-1.5">
+                      {block.bullets.map((item, ii) => (
+                        <li key={ii} className="flex gap-2 text-xs leading-relaxed text-slate-600">
+                          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400" aria-hidden />
+                          <SolverRagInlineEmphasis text={item} />
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </li>
+              );
+            }
             if (block.kind === "paragraph") {
               return (
                 <li
