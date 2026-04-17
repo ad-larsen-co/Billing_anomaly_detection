@@ -983,7 +983,7 @@ export default function App() {
               <div className="grid gap-6 lg:grid-cols-5">
                 <section className="lg:col-span-2">
                   <div className="mb-3 flex items-center justify-between">
-                    <h2 className="text-base font-semibold tracking-tight text-blue-950">Pick an anomaly</h2>
+                    <h2 className="text-base font-semibold tracking-tight text-blue-950">Anomalies</h2>
                     <span className="text-xs text-slate-500">{anomalies.length} items</span>
                   </div>
                   {renderAnomalyList((a) => setSelected(a))}
