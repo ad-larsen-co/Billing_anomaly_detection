@@ -31,10 +31,31 @@ class Settings(BaseSettings):
     # auto: try Sentence Transformers + PyTorch; hash: deterministic vectors only (avoids torch DLL issues on Windows)
     embedding_backend: Literal["auto", "hash"] = "auto"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    # Fact RAG corpus: default `data/contract_evidence.txt` under repo root (## sections), or set dir for one .txt per file
+    contract_evidence_file: str = ""
+    contract_evidence_dir: str = ""
+    # If true, delete all contract_chunks on startup and re-embed from evidence files (use after editing txt)
+    contract_force_reingest: bool = False
 
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def contract_evidence_file_path(self) -> Path:
+        raw = self.contract_evidence_file.strip()
+        if raw:
+            p = Path(raw)
+            return p.resolve() if p.is_absolute() else (ROOT / p).resolve()
+        return (ROOT / "data" / "contract_evidence.txt").resolve()
+
+    @property
+    def contract_evidence_dir_path(self) -> Path | None:
+        raw = self.contract_evidence_dir.strip()
+        if not raw:
+            return None
+        p = Path(raw)
+        return p.resolve() if p.is_absolute() else (ROOT / p).resolve()
 
 
 @lru_cache

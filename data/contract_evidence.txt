@@ -1,0 +1,55 @@
+## Enterprise Billing & Revenue Recognition Policy (v2024.3)
+
+This schedule governs invoice generation, credits, and dispute handling for all B2B product and services revenue. Effective 2024-01-01; amended 2024-09-15. Authority: CFO Office and VP Revenue Operations. Systems of record: ERP order-to-cash (O2C), contract repository CLM-PROD, and the active regional price books published each Monday 06:00 UTC. Any invoice line that cannot be tied to a valid sales order line, shipment confirmation, or professional-services timesheet must be held in billing suspense (status B-HOLD) and released only after written approval from Finance Operations. Retention: invoice images, approval trails, and price-book snapshots must be retained seven (7) years. Auditors may request the price book version ID, discount approval artifact, and the tax determination log (Vertex or equivalent) for any sampled transaction.
+
+## Pricing, price books, and discount governance (pricing_mismatch)
+
+All sellable items must be priced from the active price list for the sold-to customer’s commercial segment, currency, and effective date. A line is non-compliant if the unit price on the invoice differs from the list net of only the explicitly allowed adjustments in this section. Volume tier breaks apply by calendar month and reset on the first business day of each month; retroactive repricing requires a posted pricing exception case (PEC) with ID referenced on the order header. Standard payment-term discounts (e.g. 2% ten-net-thirty) may be applied only when the payment term code on the order matches the discount matrix row; early-pay discounts must never be stacked with promotional percentage-off campaigns.
+
+List price overrides above five percent (5%) or any net-new negative margin (below floor GP%) require dual approval: Regional Sales Director and Finance Business Partner. Aggregate line-level discounts exceeding fifteen percent (15%) off list, or any per-unit concession greater than twenty-five dollars ($25) equivalent in local currency for SKUs in categories CAT-HW and CAT-SVC, require additional written approval from the VP Sales and must be attached to the order as PDF in the “Director_Approval” folder with checksum verified. Promotional coupon codes must be validated against the campaign effective window; expired or duplicated coupon application on the same order line is prohibited.
+
+Currency: invoicing currency must match the contract currency unless a valid multi-currency amendment exists. FX for informational reporting may use the corporate rate table RATES-DAILY; invoicing FX must use the locked rate on the order at confirmation time (field ORD_FX_LOCK_ID). Rounding: per-line tax rounding follows local statute; per-invoice penny adjustments must post to a dedicated rounding GL account, not to revenue SKU lines. Any mismatch between “price × quantity − allowances” and extended line amount beyond one cent (1¢) in invoice currency must be recycled through billing validation job BV-ERR-01 before posting.
+
+## Duplicate billing, credits, and rebills (duplicate_charge)
+
+Each billable event may generate at most one posted invoice line tied to a unique tuple (sales_order_line_id, billing_schedule_id, event_type). A second invoice for the same tuple is classified as a duplicate charge unless preceded by a formal rebill authorization. Rebill paths: (R1) partial ship correction, (R2) tax jurisdiction correction, (R3) pricing correction after PEC approval. All rebills must reference the original invoice number and line numbers in the memo field and must be preceded by a credit memo (CM) or automated net-zero reversal in the same billing batch when correcting posted revenue.
+
+Credit memos must cite root cause using reason codes RC-DUP (duplicate), RC-SHIP (fulfillment delta), RC-TAX (tax determination), RC-PRC (pricing), RC-GOOD (goodwill). CM without a reason code is rejected by workflow CM-GATE-02. Waivers of CM policy for emergencies require Controller approval and a ticket in SNOW with severity P1/P2. Automated duplicate detection: orders flagged by model score DUP-RISK ≥ 0.65 must be reviewed by Billing Quality before release; two or more invoices in a rolling thirty (30) day window with identical customer, SKU, quantity, and total within 0.5% tolerance must trigger a hold.
+
+Subscription and usage-based contracts: usage lines must aggregate to the metering period boundary (calendar month or contract anniversary per exhibit B). Mid-cycle true-ups may not double-bill usage already invoiced on a prior true-up file for the same meter_id and period_id.
+
+## Tax, VAT, GST, and exemption handling (tax_compliance)
+
+Tax jurisdiction for goods is determined primarily by ship-to location; for electronic services, by the customer’s validated tax residency indicators and the rules table TAX-RULES-INTL updated quarterly. The invoice must show the correct tax registration numbers for both supplier and customer where required. Zero-rating or exemption requires a valid certificate on file with expiration date beyond invoice date; certificate numbers must appear on the invoice footnote when statute mandates.
+
+Intra-group transactions: intercompany billing must use IC price lists and arm’s-length documentation pack IC-DOC per transfer-pricing policy. Misclassification of bill-from legal entity versus ship-from warehouse may create nexus and indirect tax exposure; entity pair (BILL_FROM, SHIP_FROM) must match the routing matrix RT-ENT-01. Reverse-charge VAT must be flagged with tax code RC-VAT and narrative text prescribed by local template packs.
+
+Withholding taxes, if applicable, are calculated on the statutory base after discounts and before late fees; late fees and finance charges are generally taxable per local addendum L-SCH-FEES. Any line with tax amount deviating more than two percent (2%) from the deterministic calculator output for the same inputs must be routed to Tax Operations with the Vertex (or equivalent) trace ID attached.
+
+## Quantity, fulfillment, and revenue cut-off (quantity_anomaly)
+
+Billed quantity must not exceed shipped quantity for product lines where revenue is recognized on shipment (Incoterms ex-works or FOB shipping point unless contract defers). For professional services, billed hours may not exceed approved timesheet hours in the project work package for the same week; carryover across fiscal periods requires project manager attestation. For milestone billing, percent-complete must align with the milestone table in the SOW; billing 100% before documented acceptance is prohibited unless explicit “advanced billing” clause EX-ADV-01 is executed.
+
+Partial shipments: if multiple deliveries exist, invoice quantities must match packing slip quantities consolidated by delivery_id; cross-foot errors between delivery notes and invoice lines require logistics reconciliation before posting. Return merchandise authorization (RMA) quantities must net against open ship quantities before rebill; billing against returned units is a severity-1 control failure.
+
+Month-end close: shipments in transit near period end must use cut-off timestamps from the warehouse management system WMS-TS; manual backdating of shipment dates to pull revenue into a closed period is prohibited and is monitored by control ITGC-BILL-14.
+
+## Payment instruments, treasury, and settlement (payment_method_inconsistency)
+
+The tender type recorded on the sales order (e.g., wire, ACH, card-on-file, letter of credit) must match the settlement path used for collection. Card payments must comply with PCI scope reduction: full PAN must never be stored in order notes. Split payments across multiple instruments require Treasury pre-approval TR-SPLIT and must be documented in the cash application rules so automated matching does not create false open balances.
+
+Factoring and supplier financing arrangements: invoices assigned to a factor must carry the notice of assignment and remit-to updates per master agreement; unauthorized remit-to changes are void. Cryptocurrency or stablecoin settlement is not permitted unless addendum CRYPTO-EXC-01 is in force for the account.
+
+Chargebacks and payment reversals: when a card chargeback is received, revenue recognition must be reassessed; duplicate fulfillment billing during chargeback investigation is blocked by policy flag PAY-HOLD-CB. Bank fees for customer-initiated wires must not be booked as revenue; they post to fee income accounts per COA-FEE-09.
+
+## Fraud signals, velocity, and high-risk geography (fraud_signal)
+
+Risk Operations monitors velocity (orders per hour), geographic distance between billing and shipping addresses, device fingerprints for portal orders, and mismatches between contact email domain and registered company domain. Orders scoring above threshold FRAUD-HIGH must enter manual review queue RQ-FRD; shipping may be delayed up to twenty-four (24) business hours pending verification callback to the customer’s registered phone.
+
+New customers with first order value above fifty thousand dollars ($50,000) USD equivalent or with expedited shipping to high-risk postal codes per list FRD-GEO-01 require enhanced due diligence EDD-1. Use of freight forwarders or generic mailboxes as ship-to without a validated end-customer address is discouraged; such orders may be cancelled at seller discretion.
+
+Collusion indicators: circular billing patterns (A bills B and B bills A within seven (7) days), repeated small orders just under approval thresholds (“structuring”), and sudden changes to remittance bank details must trigger security playbook PB-ACCT-05 including vendor master verification. Employees may not approve orders where they are listed as authorized signer on the buyer account; SOX segregation of duties checks SD-SOX-22 block such combinations.
+
+## Disputes, short pays, and audit evidence pack (operational cross-reference)
+
+Customer disputes must be logged in case system DISPUTE-ONE within two (2) business days of notice. Finance may accept negotiated short pays only with documented concession; otherwise dunning proceeds per schedule DUN-STD. For audit, the evidence pack for any sampled invoice must include: price book excerpt with effective date, order approval chain, proof of shipment or service delivery, tax determination log, and any discount approvals referenced above. Missing artifacts downgrade the control rating for the billing cycle and require remediation within thirty (30) days.
